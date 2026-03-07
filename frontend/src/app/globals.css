@@ -1,0 +1,699 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS
+   Warm neutral dark — inspired by ChatGPT / Claude dark palettes
+   Inter font — industry standard for professional dense UIs
+───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surfaces — warm near-black, not cold zinc */
+  --bg:              #141414;
+  --surface-1:       #1c1c1c;
+  --surface-2:       #242424;
+  --surface-3:       #2e2e2e;
+  --surface-4:       #3a3a3a;
+  --surface-overlay: rgba(0, 0, 0, 0.65);
+
+  /* Borders — very subtle, rgba-based */
+  --border:          rgba(255, 255, 255, 0.08);
+  --border-strong:   rgba(255, 255, 255, 0.14);
+  --border-accent:   rgba(110, 122, 248, 0.4);
+
+  /* Text — warm, not bright white */
+  --text-1:          #ededed;
+  --text-2:          #a0a0a0;
+  --text-3:          #666666;
+
+  /* Accent — muted indigo, used sparingly */
+  --accent:          #6e7af8;
+  --accent-strong:   #8f9bfa;
+  --accent-soft:     rgba(110, 122, 248, 0.1);
+  --accent-border:   rgba(110, 122, 248, 0.25);
+
+  /* Semantic */
+  --success:         #4ade80;
+  --success-soft:    rgba(74, 222, 128, 0.08);
+  --success-border:  rgba(74, 222, 128, 0.2);
+  --danger:          #f87171;
+  --danger-soft:     rgba(248, 113, 113, 0.08);
+  --danger-border:   rgba(248, 113, 113, 0.2);
+  --warning:         #fb923c;
+  --warning-soft:    rgba(251, 146, 60, 0.08);
+
+  /* Focus / shadow */
+  --focus-ring:  #6e7af8;
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md:   0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-lg:   0 24px 56px rgba(0, 0, 0, 0.6);
+
+  /* Composer elevation */
+  --composer-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 16px 40px rgba(0, 0, 0, 0.28);
+  --composer-shadow-focus:
+    0 0 0 1px rgba(255, 255, 255, 0.10),
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 20px 48px rgba(0, 0, 0, 0.36);
+
+  --sidebar-width: 260px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TAILWIND THEME BRIDGE
+───────────────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  --font-sans: var(--font-inter, ui-sans-serif, system-ui, -apple-system, sans-serif);
+  --font-mono: var(--font-mono, ui-monospace, "JetBrains Mono", monospace);
+
+  --color-bg:              var(--bg);
+  --color-surface-1:       var(--surface-1);
+  --color-surface-2:       var(--surface-2);
+  --color-surface-3:       var(--surface-3);
+  --color-surface-4:       var(--surface-4);
+  --color-surface-overlay: var(--surface-overlay);
+
+  --color-border:          var(--border);
+  --color-border-strong:   var(--border-strong);
+  --color-border-accent:   var(--border-accent);
+
+  --color-text-1:          var(--text-1);
+  --color-text-2:          var(--text-2);
+  --color-text-3:          var(--text-3);
+
+  --color-accent:          var(--accent);
+  --color-accent-strong:   var(--accent-strong);
+  --color-accent-soft:     var(--accent-soft);
+  --color-accent-border:   var(--accent-border);
+
+  --color-success:         var(--success);
+  --color-success-soft:    var(--success-soft);
+  --color-success-border:  var(--success-border);
+  --color-danger:          var(--danger);
+  --color-danger-soft:     var(--danger-soft);
+  --color-danger-border:   var(--danger-border);
+  --color-warning:         var(--warning);
+  --color-warning-soft:    var(--warning-soft);
+
+  --color-focus-ring:      var(--focus-ring);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BASE
+───────────────────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* ── Hide all scrollbars globally — scroll via mouse/trackpad only ── */
+* {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE / Edge */
+}
+*::-webkit-scrollbar {
+  display: none;               /* Chrome / Safari / Webkit */
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BUTTON SYSTEM
+───────────────────────────────────────────────────────────────────────────── */
+
+.icon-btn {
+  @apply inline-flex items-center justify-center rounded-lg border border-transparent
+         text-text-3 transition-colors duration-100
+         hover:bg-surface-3 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+}
+
+.soft-btn {
+  @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent
+         text-text-3 transition-colors duration-100
+         hover:bg-surface-3 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+}
+
+.chip-btn {
+  @apply rounded-xl border border-border bg-surface-2 px-4 py-2
+         text-[13px] font-normal text-text-2 transition-colors duration-100
+         hover:border-border-strong hover:bg-surface-3 hover:text-text-1
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg
+         bg-accent px-4 py-2 text-sm font-medium text-white
+         transition-colors duration-100
+         hover:bg-accent-strong
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg
+         disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-text-3;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg
+         border border-border bg-surface-2 px-4 py-2 text-sm font-medium text-text-1
+         transition-colors duration-100
+         hover:border-border-strong hover:bg-surface-3
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg
+         border border-danger-border bg-danger-soft px-4 py-2 text-sm font-medium text-danger
+         transition-colors duration-100
+         hover:bg-red-900/20
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SIDEBAR NAV
+───────────────────────────────────────────────────────────────────────────── */
+
+.session-item {
+  @apply flex w-full items-center gap-2 rounded-lg px-3 py-2
+         text-[13px] font-normal text-text-3 transition-colors duration-100
+         hover:bg-surface-2 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+}
+
+.session-item-active {
+  @apply bg-surface-3 text-text-1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COMPOSER
+───────────────────────────────────────────────────────────────────────────── */
+
+.dock-surface {
+  @apply rounded-2xl border border-border bg-surface-2 px-4 pt-3 pb-2.5
+         transition-[border-color,box-shadow] duration-200
+         focus-within:border-border-strong;
+  box-shadow: var(--composer-shadow);
+}
+
+.dock-textarea {
+  @apply max-h-[220px] min-h-[28px] w-full resize-none overflow-y-auto
+         bg-transparent text-[15px] leading-7 text-text-1
+         placeholder:text-text-3
+         focus:outline-none;
+}
+
+.composer-card {
+  @apply rounded-2xl border border-border bg-surface-2 px-4 pt-4 pb-3.5
+         transition-[border-color,box-shadow] duration-200
+         focus-within:border-border-strong;
+  box-shadow: var(--composer-shadow);
+}
+
+.composer-card:focus-within {
+  box-shadow: var(--composer-shadow-focus);
+}
+
+.composer-textarea {
+  @apply max-h-[200px] min-h-[26px] w-full resize-none overflow-y-auto
+         bg-transparent leading-[1.7] text-text-1
+         placeholder:text-text-3
+         focus:outline-none;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.composer-send {
+  @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+         bg-[#e8e8e8] text-[#111]
+         transition-colors duration-100
+         hover:bg-white
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2
+         disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-text-3;
+}
+
+/* Stop generation button — outlined circle with filled square */
+.composer-stop {
+  @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+         border border-[rgba(255,255,255,0.25)] text-text-2
+         transition-colors duration-100
+         hover:border-[rgba(255,255,255,0.45)] hover:text-text-1
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CHAT MESSAGES
+───────────────────────────────────────────────────────────────────────────── */
+
+.msg-user {
+  @apply max-w-[72%] rounded-2xl rounded-br-md
+         bg-surface-3 px-4 py-3 text-[15px] leading-[1.7] text-text-1;
+}
+
+.msg-assistant {
+  @apply max-w-full;
+}
+
+/* Tool buttons — copy / edit — shown on hover or always for responses */
+.msg-tool-btn {
+  @apply inline-flex items-center justify-center rounded-md
+         px-2 py-1 text-text-3
+         transition-colors duration-100
+         hover:bg-surface-3 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring;
+}
+
+/* Inline edit textarea for user messages */
+.msg-edit-textarea {
+  @apply w-full resize-none rounded-2xl rounded-br-md border border-border-strong
+         bg-surface-3 px-4 py-3 text-[15px] leading-[1.7] text-text-1
+         focus:outline-none;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Edit action buttons */
+.msg-action-btn {
+  @apply rounded-lg px-3 py-1.5 text-[12px] font-medium
+         transition-colors duration-100
+         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring;
+}
+
+.msg-action-btn-primary {
+  @apply inline-flex items-center rounded-lg bg-[#e8e8e8] px-3 py-1.5
+         text-[12px] font-medium text-[#111]
+         transition-colors duration-100
+         hover:bg-white
+         disabled:cursor-not-allowed disabled:opacity-40
+         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   STATUS BADGES
+───────────────────────────────────────────────────────────────────────────── */
+
+.status-badge {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5
+         text-[11px] font-medium tracking-wide;
+}
+
+.status-badge-success {
+  @apply bg-success-soft text-success border border-success-border;
+}
+
+.status-badge-info {
+  @apply bg-accent-soft text-accent border border-accent-border;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   STATUS CARDS
+───────────────────────────────────────────────────────────────────────────── */
+
+.status-card {
+  @apply rounded-xl border px-4 py-3 text-sm;
+}
+
+.status-card-error {
+  @apply border-danger-border bg-danger-soft text-danger;
+}
+
+.status-card-success {
+  @apply border-success-border bg-success-soft text-success;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   EMPTY STATE
+───────────────────────────────────────────────────────────────────────────── */
+
+.state-panel {
+  @apply rounded-2xl border border-border bg-surface-2/50 p-6 backdrop-blur-sm md:p-8;
+}
+
+.state-title {
+  @apply text-xl font-semibold tracking-tight text-text-1 md:text-2xl;
+}
+
+.state-copy {
+  @apply mt-2 text-sm leading-6 text-text-2;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SKELETON LOADING
+───────────────────────────────────────────────────────────────────────────── */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-row {
+  @apply h-3 rounded-full;
+}
+
+.skeleton-bubble {
+  @apply rounded-xl border border-border bg-surface-2 p-4;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   STREAMING CURSOR
+───────────────────────────────────────────────────────────────────────────── */
+
+.streaming-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: var(--text-2);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursorBlink 1s step-start infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   THINKING INDICATOR
+───────────────────────────────────────────────────────────────────────────── */
+
+/* "Thinking…" shown while waiting for first token */
+.thinking-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.thinking-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+/* Three bouncing dots */
+.thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.thinking-dots span {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--text-3);
+  animation: thinkingBounce 1.2s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: 0s; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes thinkingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-4px); opacity: 1; }
+}
+
+/* "Thought for Xs" badge shown once first token arrives */
+.thought-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  margin-bottom: 0.875rem;
+  padding: 0.2rem 0.625rem 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.thought-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  opacity: 0.8;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MOBILE DRAWER
+───────────────────────────────────────────────────────────────────────────── */
+
+.app-drawer-overlay {
+  @apply fixed inset-0 z-30 bg-surface-overlay backdrop-blur-[2px] md:hidden;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.app-drawer-panel {
+  @apply fixed inset-y-0 left-0 z-40 w-[264px] max-w-[85vw]
+         border-r border-border bg-surface-1
+         shadow-[4px_0_32px_rgba(0,0,0,0.6)] md:hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MARKDOWN CONTENT
+───────────────────────────────────────────────────────────────────────────── */
+
+.markdown-content {
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.75;
+  color: var(--text-1);
+}
+
+/* Vertical rhythm — controlled manually to avoid double-spacing */
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content pre,
+.markdown-content table {
+  margin-top: 0;
+  margin-bottom: 0.875rem;
+}
+
+.markdown-content p:last-child,
+.markdown-content ul:last-child,
+.markdown-content ol:last-child,
+.markdown-content blockquote:last-child,
+.markdown-content pre:last-child,
+.markdown-content table:last-child {
+  margin-bottom: 0;
+}
+
+/* No extra margin on paragraphs inside list items */
+.markdown-content li > p {
+  margin-bottom: 0;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+}
+
+.markdown-content h1:first-child,
+.markdown-content h2:first-child,
+.markdown-content h3:first-child {
+  margin-top: 0;
+}
+
+.markdown-content h1 { font-size: 1.2rem; }
+.markdown-content h2 { font-size: 1.075rem; }
+.markdown-content h3 { font-size: 1rem; }
+
+.markdown-content ul {
+  margin-left: 1.375rem;
+  list-style-type: disc;
+}
+
+.markdown-content ol {
+  margin-left: 1.375rem;
+  list-style-type: decimal;
+}
+
+.markdown-content li {
+  color: var(--text-1);
+  line-height: 1.75;
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content li:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.1s;
+}
+
+.markdown-content a:hover {
+  color: var(--accent-strong);
+}
+
+.markdown-content blockquote {
+  border-left: 2px solid var(--border-strong);
+  padding-left: 1rem;
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.25rem 0;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.markdown-content th {
+  background-color: var(--surface-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+
+.markdown-content pre {
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+}
+
+.markdown-content pre code {
+  display: block;
+  overflow-x: auto;
+  padding: 1rem;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e2e8f0;
+  background: transparent;
+  font-family: var(--font-mono), ui-monospace, "JetBrains Mono", monospace;
+}
+
+.markdown-content code {
+  border-radius: 0.375rem;
+  background-color: var(--surface-3);
+  padding: 0.125rem 0.375rem;
+  font-size: 13px;
+  color: var(--text-2);
+  font-family: var(--font-mono), ui-monospace, "JetBrains Mono", monospace;
+}
+
+/* pre > code overrides inline code */
+.markdown-content pre > code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ANIMATIONS
+───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.msg-enter {
+  animation: msgSlideUp 0.18s ease-out both;
+}
+
+@keyframes msgSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.msg-enter {
+  animation: msgSlideUp 0.15s ease-out both;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   REDUCED MOTION
+───────────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .skeleton {
+    animation: none;
+    background: var(--surface-2);
+  }
+
+  .streaming-cursor::after {
+    animation: none;
+    opacity: 1;
+  }
+}

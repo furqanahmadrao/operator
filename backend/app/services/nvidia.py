@@ -1,0 +1,65 @@
+import json
+from collections.abc import AsyncGenerator
+
+import httpx
+
+from app.api.schemas import ChatMessage
+from app.config import settings
+
+
+class NVIDIAClient:
+    def __init__(self) -> None:
+        self.base_url = settings.nvidia_base_url
+        self.model = settings.nvidia_model
+        self.api_key = settings.nvidia_api_key
+
+    async def chat_completion(
+        self,
+        messages: list[ChatMessage],
+        stream: bool = True,
+    ) -> AsyncGenerator[str, None]:
+        if not self.api_key:
+            raise RuntimeError("Missing NVIDIA_API_KEY. Add it to backend/.env.")
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": [message.model_dump() for message in messages],
+            "stream": stream,
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+
+                    data = line[6:].strip()
+                    if data == "[DONE]":
+                        break
+
+                    try:
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+
+                    choices = chunk.get("choices", [])
+                    if not choices:
+                        continue
+
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content")
+                    if isinstance(content, str) and content:
+                        yield content
+
+
+nvidia_client = NVIDIAClient()
