@@ -9,7 +9,7 @@ export function LeftRail() {
           type="button"
           aria-label="Open workspace"
           title="Agent workspace"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft text-[13px] font-bold tracking-tight text-accent transition-all duration-150 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-3 text-[13px] font-bold tracking-tight text-text-1 transition-all duration-150 hover:bg-surface-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           AG
         </button>

@@ -1,114 +1,390 @@
-import { MessageSquare, Plus, X } from "lucide-react";
+"use client";
+
+import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  BookOpen,
+  Check,
+  FolderOpen,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  PinOff,
+  Trash2,
+} from "lucide-react";
+
+import type { Session } from "@/lib/sessions-api";
+
+// ── Date grouping ─────────────────────────────────────────────────────────────
+
+type DateGroup = { label: string; items: Session[]; isPinned?: boolean };
+
+function groupSessions(sessions: Session[]): DateGroup[] {
+  const pinned = sessions.filter((s) => s.pinned);
+  const unpinned = sessions.filter((s) => !s.pinned);
+
+  const now = Date.now();
+  const DAY = 86_400_000;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayMs = todayStart.getTime();
+
+  const groups: Record<string, Session[]> = {
+    Today: [],
+    Yesterday: [],
+    "Last 7 days": [],
+    Older: [],
+  };
+
+  for (const s of unpinned) {
+    const t = new Date(s.updated_at).getTime();
+    const age = now - t;
+    if (t >= todayMs) {
+      groups.Today.push(s);
+    } else if (age < 2 * DAY) {
+      groups.Yesterday.push(s);
+    } else if (age < 7 * DAY) {
+      groups["Last 7 days"].push(s);
+    } else {
+      groups.Older.push(s);
+    }
+  }
+
+  const result: DateGroup[] = [];
+  if (pinned.length > 0) {
+    result.push({ label: "Pinned", items: pinned, isPinned: true });
+  }
+  result.push(
+    ...Object.entries(groups)
+      .filter(([, items]) => items.length > 0)
+      .map(([label, items]) => ({ label, items })),
+  );
+  return result;
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
 type SessionSidebarProps = {
   open: boolean;
-  mobile?: boolean;
-  onClose?: () => void;
+  sessions: Session[];
+  activeSessionId: string | null;
+  onSelect: (id: string) => void;
+  onRename: (id: string, title: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onPin: (id: string, pinned: boolean) => Promise<void>;
+  onClose: () => void;
 };
 
-const SESSIONS = {
-  today: [
-    { id: "1", title: "UI redesign for production-grade chat", active: true },
-    { id: "2", title: "Phase 1 premium chat shell wireframes" },
-  ],
-  yesterday: [
-    { id: "3", title: "Backend streaming architecture review" },
-  ],
-};
-
-export function SessionSidebar({ open, mobile = false, onClose }: SessionSidebarProps) {
-  const sidebarId = mobile ? "session-sidebar-mobile" : "session-sidebar";
-  const sidebarClassName = mobile
-    ? `app-drawer-panel transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`
-    : `hidden border-r border-border bg-surface-1 transition-[width] duration-200 md:block ${
-        open ? "w-[264px]" : "w-0 border-r-0 overflow-hidden"
-      }`;
+export function SessionSidebar({
+  open,
+  sessions,
+  activeSessionId,
+  onSelect,
+  onRename,
+  onDelete,
+  onPin,
+  onClose,
+}: SessionSidebarProps) {
+  const groups = groupSessions(sessions);
 
   return (
     <aside
-      id={sidebarId}
-      className={sidebarClassName}
+      id="session-sidebar"
+      aria-label="Chat history"
       aria-hidden={!open}
-      role={mobile ? "dialog" : undefined}
-      aria-modal={mobile ? true : undefined}
-      aria-label="Session navigation"
+      className={`flex h-full shrink-0 flex-col border-r ${
+        open
+          ? "w-[260px] border-[rgba(255,255,255,0.05)]"
+          : "w-0 overflow-hidden border-transparent"
+      }`}
+      style={{ background: "#131313" }}
     >
-      {open ? (
-        <div className="flex h-full flex-col overflow-hidden">
-          {/* Header */}
-          <div className="shrink-0 border-b border-border px-4 py-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[15px] font-semibold leading-tight text-text-1">Agent</p>
-                <p className="mt-0.5 truncate font-mono text-[11px] text-text-3">~/Documents/Github/Agent</p>
-              </div>
+      {/* Top nav: Library + Projects */}
+      <div className="shrink-0 space-y-px border-b border-[rgba(255,255,255,0.05)] p-2">
+        <Link href="/library" className="sidebar-nav-btn" aria-label="Library">
+          <BookOpen size={13} />
+          <span>Library</span>
+        </Link>
+        <Link href="/projects" className="sidebar-nav-btn" aria-label="Projects">
+          <FolderOpen size={13} />
+          <span>Projects</span>
+        </Link>
+      </div>
 
-              {mobile ? (
-                <button
-                  type="button"
-                  className="icon-btn h-8 w-8 shrink-0"
-                  onClick={onClose}
-                  aria-label="Close sessions sidebar"
-                  data-sidebar-close="true"
-                >
-                  <X size={14} />
-                </button>
-              ) : null}
-            </div>
-
-            <button type="button" className="btn-secondary mt-3 h-9 w-full gap-1.5 text-sm">
-              <Plus size={13} />
-              New session
-            </button>
-          </div>
-
-          {/* Session list */}
-          <div className="flex-1 overflow-y-auto px-3 py-3">
-            {/* Today */}
-            <section className="mb-4">
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-text-3">
-                Today
+      {/* Session list */}
+      <nav
+        className="flex-1 overflow-y-auto px-0 py-1"
+        aria-label="Past chats"
+      >
+        {sessions.length === 0 ? (
+          <p className="pl-4 py-4 text-[12px] text-text-3">
+            No chats yet — start a new one.
+          </p>
+        ) : (
+          groups.map((group) => (
+            <section key={group.label} className="mb-1">
+              <p className="flex items-center gap-1.5 pl-3 pr-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-3">
+                {group.isPinned && <Pin size={8} className="shrink-0" />}
+                {group.label}
               </p>
-              <ul className="space-y-0.5">
-                {SESSIONS.today.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className={`session-item ${ item.active ? "session-item-active" : ""}`}
-                      aria-label={`Open session: ${item.title}`}
-                      aria-current={item.active ? "page" : undefined}
-                    >
-                      <MessageSquare size={12} className="shrink-0 text-text-3" />
-                      <span className="truncate">{item.title}</span>
-                    </button>
+              <ul className="space-y-px">
+                {group.items.map((session) => (
+                  <li key={session.id}>
+                    <SessionItem
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      onSelect={() => {
+                        onSelect(session.id);
+                        onClose();
+                      }}
+                      onRename={(title) => onRename(session.id, title)}
+                      onDelete={() => onDelete(session.id)}
+                      onPin={(pinned) => onPin(session.id, pinned)}
+                    />
                   </li>
                 ))}
               </ul>
             </section>
+          ))
+        )}
+      </nav>
 
-            {/* Yesterday */}
-            <section>
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-text-3">
-                Yesterday
-              </p>
-              <ul className="space-y-0.5">
-                {SESSIONS.yesterday.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className="session-item"
-                      aria-label={`Open session: ${item.title}`}
-                    >
-                      <MessageSquare size={12} className="shrink-0 text-text-3" />
-                      <span className="truncate">{item.title}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-        </div>
-      ) : null}
     </aside>
   );
 }
+
+// ── Individual session row ────────────────────────────────────────────────────
+
+type SessionItemProps = {
+  session: Session;
+  isActive: boolean;
+  onSelect: () => void;
+  onRename: (title: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onPin: (pinned: boolean) => Promise<void>;
+};
+
+function SessionItem({
+  session,
+  isActive,
+  onSelect,
+  onRename,
+  onDelete,
+  onPin,
+}: SessionItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(session.title);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        !dropdownRef.current?.contains(e.target as Node) &&
+        !menuBtnRef.current?.contains(e.target as Node)
+      ) {
+        setMenuOpen(false);
+        setConfirmDelete(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      setTimeout(() => inputRef.current?.select(), 0);
+    }
+  }, [isEditing]);
+
+  const openMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const btn = menuBtnRef.current;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: document.documentElement.clientWidth - rect.right,
+      });
+    }
+    setMenuOpen((v) => !v);
+    setConfirmDelete(false);
+  };
+
+  const startEdit = () => {
+    setMenuOpen(false);
+    setEditValue(session.title);
+    setIsEditing(true);
+  };
+
+  const saveEdit = async () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== session.title) {
+      await onRename(trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleEditKeyDown = async (
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      await saveEdit();
+    }
+    if (e.key === "Escape") {
+      setIsEditing(false);
+      setEditValue(session.title);
+    }
+  };
+
+  // ── Editing state ─────────────────────────────────────────────────────────
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1 rounded-lg bg-surface-3 px-2 py-1.5">
+        <input
+          ref={inputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleEditKeyDown}
+          onBlur={saveEdit}
+          className="min-w-0 flex-1 rounded bg-transparent text-[13px] text-text-1 focus:outline-none"
+          aria-label="Rename session"
+        />
+        <button
+          type="button"
+          onClick={saveEdit}
+          className="shrink-0 rounded p-0.5 text-text-3 hover:text-text-1 focus:outline-none"
+          aria-label="Save rename"
+        >
+          <Check size={12} />
+        </button>
+      </div>
+    );
+  }
+
+  // ── Normal row ────────────────────────────────────────────────────────────
+  return (
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
+        className={`session-item group ${isActive ? "session-item-active" : ""}`}
+        aria-current={isActive ? "page" : undefined}
+      >
+        <span className="min-w-0 flex-1 truncate text-left">
+          {session.title}
+        </span>
+        {session.pinned && (
+          <Pin
+            size={9}
+            className="shrink-0 text-text-3 opacity-40 transition-opacity group-hover:opacity-0"
+          />
+        )}
+        {/* 3-dot menu trigger */}
+        <button
+          ref={menuBtnRef}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); openMenu(e); }}
+          className="shrink-0 rounded p-0.5 text-text-3 opacity-0 transition-opacity hover:text-text-2 focus:opacity-100 focus:outline-none group-hover:opacity-100"
+          aria-label="More options"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+        >
+          <MoreHorizontal size={13} />
+        </button>
+      </div>
+
+      {/* Dropdown — portal so it escapes overflow:hidden on aside/nav */}
+      {menuOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            role="menu"
+            className="session-dropdown"
+            style={{ top: menuPos.top, right: menuPos.right }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {!confirmDelete ? (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={startEdit}
+                  className="session-dropdown-item"
+                >
+                  <Pencil size={12} />
+                  <span>Rename</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={async () => {
+                    await onPin(!session.pinned);
+                    setMenuOpen(false);
+                  }}
+                  className="session-dropdown-item"
+                >
+                  {session.pinned ? (
+                    <PinOff size={12} />
+                  ) : (
+                    <Pin size={12} />
+                  )}
+                  <span>{session.pinned ? "Unpin" : "Pin"}</span>
+                </button>
+                <div className="session-dropdown-divider" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setConfirmDelete(true)}
+                  className="session-dropdown-item session-dropdown-item-danger"
+                >
+                  <Trash2 size={12} />
+                  <span>Delete</span>
+                </button>
+              </>
+            ) : (
+              <div className="px-3 py-2.5">
+                <p className="mb-2.5 text-[12px] font-medium leading-tight text-text-2">
+                  Delete this chat?
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setMenuOpen(false);
+                      await onDelete();
+                    }}
+                    className="flex-1 rounded-md border border-danger-border bg-danger-soft px-2.5 py-1.5 text-[11.5px] font-medium text-danger transition-colors hover:bg-[rgba(180,100,100,0.14)] focus:outline-none"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    className="flex-1 rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-[11.5px] font-medium text-text-2 transition-colors hover:bg-surface-3 hover:text-text-1 focus:outline-none"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+

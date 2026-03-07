@@ -7,57 +7,59 @@
 ───────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Surfaces — warm near-black, not cold zinc */
-  --bg:              #141414;
-  --surface-1:       #1c1c1c;
-  --surface-2:       #242424;
-  --surface-3:       #2e2e2e;
-  --surface-4:       #3a3a3a;
-  --surface-overlay: rgba(0, 0, 0, 0.65);
+  /* Surfaces — deep monochrome, premium dark */
+  --bg:              #0f0f0f;
+  --surface-1:       #181818;
+  --surface-2:       #1e1e1e;
+  --surface-3:       #2a2a2a;
+  --surface-4:       #363636;
+  --surface-overlay: rgba(0, 0, 0, 0.72);
 
   /* Borders — very subtle, rgba-based */
-  --border:          rgba(255, 255, 255, 0.08);
-  --border-strong:   rgba(255, 255, 255, 0.14);
-  --border-accent:   rgba(110, 122, 248, 0.4);
+  --border:          rgba(255, 255, 255, 0.07);
+  --border-strong:   rgba(255, 255, 255, 0.13);
+  --border-accent:   rgba(255, 255, 255, 0.15);
 
-  /* Text — warm, not bright white */
-  --text-1:          #ededed;
-  --text-2:          #a0a0a0;
-  --text-3:          #666666;
+  /* Text — crisp white hierarchy */
+  --text-1:          #ebebeb;
+  --text-2:          #999999;
+  --text-3:          #555555;
 
-  /* Accent — muted indigo, used sparingly */
-  --accent:          #6e7af8;
-  --accent-strong:   #8f9bfa;
-  --accent-soft:     rgba(110, 122, 248, 0.1);
-  --accent-border:   rgba(110, 122, 248, 0.25);
+  /* Accent — pure white / off-white (monochrome primary) */
+  --accent:          #ffffff;
+  --accent-strong:   #f0f0f0;
+  --accent-soft:     rgba(255, 255, 255, 0.05);
+  --accent-border:   rgba(255, 255, 255, 0.12);
 
-  /* Semantic */
-  --success:         #4ade80;
-  --success-soft:    rgba(74, 222, 128, 0.08);
-  --success-border:  rgba(74, 222, 128, 0.2);
-  --danger:          #f87171;
-  --danger-soft:     rgba(248, 113, 113, 0.08);
-  --danger-border:   rgba(248, 113, 113, 0.2);
-  --warning:         #fb923c;
-  --warning-soft:    rgba(251, 146, 60, 0.08);
+  /* Semantic — muted, functional */
+  --success:         #888888;
+  --success-soft:    rgba(255, 255, 255, 0.04);
+  --success-border:  rgba(255, 255, 255, 0.09);
+  --danger:          #c47a7a;
+  --danger-soft:     rgba(180, 100, 100, 0.08);
+  --danger-border:   rgba(180, 100, 100, 0.22);
+  --warning:         #888888;
+  --warning-soft:    rgba(255, 255, 255, 0.04);
 
   /* Focus / shadow */
-  --focus-ring:  #6e7af8;
-  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md:   0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-lg:   0 24px 56px rgba(0, 0, 0, 0.6);
+  --focus-ring:  rgba(255, 255, 255, 0.5);
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md:   0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-lg:   0 24px 56px rgba(0, 0, 0, 0.7);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 
   /* Composer elevation */
   --composer-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 4px 12px rgba(0, 0, 0, 0.4),
-    0 16px 40px rgba(0, 0, 0, 0.28);
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 16px 40px rgba(0, 0, 0, 0.35);
   --composer-shadow-focus:
-    0 0 0 1px rgba(255, 255, 255, 0.10),
-    0 4px 16px rgba(0, 0, 0, 0.5),
-    0 20px 48px rgba(0, 0, 0, 0.36);
+    0 0 0 1px rgba(255, 255, 255, 0.11),
+    0 4px 16px rgba(0, 0, 0, 0.6),
+    0 20px 48px rgba(0, 0, 0, 0.42);
 
   --sidebar-width: 260px;
+  --sidebar-bg:     #131313;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -162,9 +164,9 @@ body {
 
 .btn-primary {
   @apply inline-flex items-center justify-center gap-2 rounded-lg
-         bg-accent px-4 py-2 text-sm font-medium text-white
+         bg-white px-4 py-2 text-sm font-medium text-[#0a0a0a]
          transition-colors duration-100
-         hover:bg-accent-strong
+         hover:bg-[#e8e8e8]
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg
          disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-text-3;
 }
@@ -181,23 +183,33 @@ body {
   @apply inline-flex items-center justify-center gap-2 rounded-lg
          border border-danger-border bg-danger-soft px-4 py-2 text-sm font-medium text-danger
          transition-colors duration-100
-         hover:bg-red-900/20
+         hover:bg-danger-soft
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    SIDEBAR NAV
+   Background: #131313  —  contrast analysis:
+   • text-text-3 (#555555) → 1.95:1  — FAILS WCAG AA (unusable for body text)
+   • text-text-2 (#999999) → 5.30:1  — PASSES AA ✓
+   • text-text-1 (#ebebeb) → 13.2:1  — PASSES AAA ✓
+   Inactive items use text-text-2 for readable contrast.
+   Active item matches composer bar surface (#1e1e1e) for visual consistency.
 ───────────────────────────────────────────────────────────────────────────── */
 
 .session-item {
   @apply flex w-full items-center gap-2 rounded-lg px-3 py-2
-         text-[13px] font-normal text-text-3 transition-colors duration-100
-         hover:bg-surface-2 hover:text-text-2
+         text-[13px] font-normal text-text-2 transition-colors duration-100
+         hover:bg-surface-2 hover:text-text-1
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
 }
 
 .session-item-active {
-  @apply bg-surface-3 text-text-1;
+  /* bg matches composer bar (#1e1e1e = surface-2). Left rule marks selection. */
+  background: #1e1e1e;
+  color: var(--text-1);
+  padding-left: calc(0.75rem - 2px);
+  border-left: 2px solid rgba(255, 255, 255, 0.22);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -219,7 +231,7 @@ body {
 }
 
 .composer-card {
-  @apply rounded-2xl border border-border bg-surface-2 px-4 pt-4 pb-3.5
+  @apply rounded-2xl border border-border bg-surface-2 px-4 pt-3 pb-2.5
          transition-[border-color,box-shadow] duration-200
          focus-within:border-border-strong;
   box-shadow: var(--composer-shadow);
@@ -230,17 +242,17 @@ body {
 }
 
 .composer-textarea {
-  @apply max-h-[200px] min-h-[26px] w-full resize-none overflow-y-auto
-         bg-transparent leading-[1.7] text-text-1
+  @apply max-h-[180px] min-h-[22px] w-full resize-none overflow-y-auto
+         bg-transparent leading-[1.65] text-text-1
          placeholder:text-text-3
          focus:outline-none;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 400;
 }
 
 .composer-send {
-  @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full
-         bg-[#e8e8e8] text-[#111]
+  @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full
+         bg-[#dcdcdc] text-[#0a0a0a]
          transition-colors duration-100
          hover:bg-white
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2
@@ -249,11 +261,121 @@ body {
 
 /* Stop generation button — outlined circle with filled square */
 .composer-stop {
-  @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full
-         border border-[rgba(255,255,255,0.25)] text-text-2
+  @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full
+         border border-[rgba(255,255,255,0.18)] text-text-2
          transition-colors duration-100
-         hover:border-[rgba(255,255,255,0.45)] hover:text-text-1
+         hover:border-[rgba(255,255,255,0.38)] hover:text-text-1
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2;
+}
+
+/* Composer toolbar icon buttons (+, sliders, briefcase) */
+.composer-icon-btn {
+  @apply relative inline-flex h-7 w-7 items-center justify-center rounded-lg
+         text-text-3 transition-colors duration-100
+         hover:bg-surface-3 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring;
+}
+
+/* Composer dropdown panel (shared by all three menus) */
+.composer-dropdown {
+  position: absolute;
+  left: 0;
+  min-width: 220px;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+  z-index: 50;
+  /* default: opens downward */
+  top: 100%;
+  margin-top: 8px;
+}
+/* When composer is pinned to bottom, open upward */
+.composer-dropdown-up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+/* Composer dropdown item — links / buttons in + menu */
+.composer-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 12.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+  transition: background-color 100ms;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+.composer-dropdown-item:hover {
+  background: var(--surface-3);
+}
+
+/* Tools row inside tools dropdown */
+.composer-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  white-space: nowrap;
+}
+
+/* Toggle switch in tools dropdown */
+.composer-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  transition: background-color 180ms ease;
+  outline: none;
+}
+.composer-toggle-off {
+  background: rgba(255, 255, 255, 0.12);
+}
+.composer-toggle-on {
+  background: #ffffff;
+}
+.composer-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  transition: transform 180ms ease, background-color 180ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.composer-toggle-off .composer-toggle-thumb {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.45);
+}
+.composer-toggle-on .composer-toggle-thumb {
+  transform: translateX(19px);
+  background: #111111;
+}
+
+/* Active tool pill — appears inline in the composer toolbar */
+.tool-active-pill {
+  @apply inline-flex shrink-0 items-center gap-1 rounded-full
+         border border-border bg-surface-3
+         px-2 py-0.5
+         text-[11px] font-medium text-text-2
+         transition-colors duration-100
+         hover:border-border-strong hover:text-text-1;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -261,8 +383,10 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .msg-user {
-  @apply max-w-[72%] rounded-2xl rounded-br-md
-         bg-surface-3 px-4 py-3 text-[15px] leading-[1.7] text-text-1;
+  @apply max-w-[72%] rounded-2xl rounded-br-sm
+         px-3.5 py-2.5 text-[14.5px] leading-[1.65] text-text-1;
+  background: #252525;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .msg-assistant {
@@ -280,8 +404,8 @@ body {
 
 /* Inline edit textarea for user messages */
 .msg-edit-textarea {
-  @apply w-full resize-none rounded-2xl rounded-br-md border border-border-strong
-         bg-surface-3 px-4 py-3 text-[15px] leading-[1.7] text-text-1
+  @apply w-full resize-none rounded-2xl rounded-br-sm border border-border-strong
+         bg-surface-3 px-3.5 py-2.5 text-[14.5px] leading-[1.65] text-text-1
          focus:outline-none;
   max-height: 300px;
   overflow-y: auto;
@@ -313,11 +437,11 @@ body {
 }
 
 .status-badge-success {
-  @apply bg-success-soft text-success border border-success-border;
+  @apply bg-surface-2 text-text-2 border border-border;
 }
 
 .status-badge-info {
-  @apply bg-accent-soft text-accent border border-accent-border;
+  @apply bg-surface-2 text-text-2 border border-border;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -333,7 +457,7 @@ body {
 }
 
 .status-card-success {
-  @apply border-success-border bg-success-soft text-success;
+  @apply border-border bg-surface-2 text-text-1;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -394,25 +518,26 @@ body {
    THINKING INDICATOR
 ───────────────────────────────────────────────────────────────────────────── */
 
-/* "Thinking…" shown while waiting for first token */
+/* "Thinking…" shown while waiting for first token — now a proper row */
 .thinking-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 7px;
   animation: fadeIn 0.2s ease-out;
 }
 
 .thinking-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--text-3);
+  letter-spacing: 0.01em;
 }
 
-/* Three bouncing dots */
+/* Three bouncing dots — smooth wave */
 .thinking-dots {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .thinking-dots span {
@@ -421,41 +546,93 @@ body {
   height: 4px;
   border-radius: 50%;
   background-color: var(--text-3);
-  animation: thinkingBounce 1.2s ease-in-out infinite;
+  animation: thinkingWave 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
 .thinking-dots span:nth-child(1) { animation-delay: 0s; }
-.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
-.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.30s; }
 
-@keyframes thinkingBounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30%            { transform: translateY(-4px); opacity: 1; }
+@keyframes thinkingWave {
+  0%, 45%, 100% { transform: translateY(0);    opacity: 0.22; }
+  22%            { transform: translateY(-5px); opacity: 0.9; }
 }
 
-/* "Thought for Xs" badge shown once first token arrives */
+/* "Thought for Xs" — minimal inline label, no pill shape */
 .thought-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--accent);
-  margin-bottom: 0.875rem;
-  padding: 0.2rem 0.625rem 0.2rem 0.5rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
-  animation: fadeIn 0.2s ease-out;
+  gap: 0.3rem;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-3);
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.01em;
+  animation: thoughtBadgeEnter 0.25s ease-out both;
+}
+
+@keyframes thoughtBadgeEnter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .thought-dot {
   display: inline-block;
-  width: 5px;
-  height: 5px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  background-color: var(--accent);
-  opacity: 0.8;
+  background-color: var(--text-3);
+  opacity: 0.5;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT GENERATING PLACEHOLDER (shown while artifact is streaming)
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-generating-placeholder {
+  @apply flex items-center gap-2.5 rounded-xl border border-border px-4 py-2.5;
+  background: var(--surface-2);
+  animation: fadeIn 0.18s ease-out;
+  max-width: 480px;
+}
+
+/* Artifact card entrance — spring-like pop when artifact is ready */
+.artifact-card-enter {
+  animation: artifactCardEnter 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes artifactCardEnter {
+  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MOBILE DRAWER
+───────────────────────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   LEFT RAIL
+───────────────────────────────────────────────────────────────────────────── */
+
+.rail-btn {
+  @apply inline-flex h-9 w-9 items-center justify-center rounded-xl
+         text-text-3 transition-colors duration-100
+         hover:bg-surface-3 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1;
+}
+
+.rail-btn-active {
+  @apply bg-surface-3 text-text-2;
+}
+
+/* Pulse animation for status indicators */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.pulse-dot {
+  animation: pulseDot 2s ease-in-out infinite;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -550,14 +727,16 @@ body {
 }
 
 .markdown-content a {
-  color: var(--accent);
+  color: var(--text-2);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
   transition: color 0.1s;
 }
 
 .markdown-content a:hover {
-  color: var(--accent-strong);
+  color: var(--text-1);
+  text-decoration-color: rgba(255, 255, 255, 0.4);
 }
 
 .markdown-content blockquote {
@@ -696,4 +875,992 @@ body {
     animation: none;
     opacity: 1;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FILES BUTTON (top bar)
+───────────────────────────────────────────────────────────────────────────── */
+
+.files-btn {
+  @apply inline-flex h-7 items-center gap-1.5 rounded-lg border border-border
+         bg-surface-2 px-2.5 text-[12px] font-medium text-text-3
+         transition-colors duration-100
+         hover:border-border-strong hover:bg-surface-3 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+}
+
+.files-btn-has-items {
+  @apply border-border-strong text-text-1;
+}
+
+.files-btn-badge {
+  @apply flex h-4 min-w-[16px] items-center justify-center rounded-full
+         bg-surface-3 px-1 text-[10px] font-semibold text-text-2;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CODE BLOCK (fenced code in react-markdown)
+───────────────────────────────────────────────────────────────────────────── */
+
+.code-block {
+  @apply my-3 overflow-hidden rounded-xl border border-border bg-[#141414];
+}
+
+.code-block-header {
+  @apply flex items-center justify-between border-b border-border px-4 py-2;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.code-block-lang {
+  @apply text-[10.5px] font-semibold uppercase tracking-widest text-text-3;
+}
+
+.code-block-copy-btn {
+  @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5
+         text-[11px] font-medium text-text-3 transition-colors duration-100
+         hover:bg-surface-3 hover:text-text-2;
+}
+
+.code-block-pre {
+  @apply overflow-x-auto p-3.5;
+}
+
+.code-block-code {
+  @apply block font-mono leading-[1.55] text-[#b0b0b0];
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 12px;
+}
+
+/* Inline code */
+.inline-code {
+  @apply rounded-md border border-border bg-surface-2 px-1.5 py-0.5
+         font-mono text-[12px] text-text-2;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT ITEMS (Files panel list)
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-item {
+  @apply flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5
+         text-left text-[13px] font-normal text-text-3
+         transition-colors duration-100
+         hover:bg-surface-2 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
+}
+
+.artifact-item-active {
+  @apply bg-surface-2 text-text-1;
+  border-left: 2px solid rgba(255, 255, 255, 0.22);
+  padding-left: calc(0.75rem - 2px);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT PREVIEW (Files panel right pane)
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-preview {
+  @apply flex h-full flex-col;
+}
+
+.artifact-preview-header {
+  @apply flex shrink-0 items-center gap-3 border-b border-border-strong px-4 py-3.5;
+}
+
+.artifact-preview-body {
+  @apply min-h-0 flex-1 overflow-y-auto p-6;
+}
+
+.artifact-action-btn {
+  @apply inline-flex h-7 w-7 items-center justify-center rounded-lg
+         text-text-3 transition-colors duration-100
+         hover:bg-surface-3 hover:text-text-2
+         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring
+         disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SPLIT-PANEL: RESIZE HANDLE
+───────────────────────────────────────────────────────────────────────────── */
+
+.split-resize-handle {
+  /* 5px clickable zone — 1px visible grip line */
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  transition: background 0.15s;
+  z-index: 10;
+}
+
+.split-resize-handle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  left: 2px;
+  width: 1px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+
+.split-resize-handle:hover::after,
+.split-resize-handle:active::after {
+  background: rgba(255, 255, 255, 0.25);
+  width: 2px;
+  left: 1.5px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT PANEL CONTAINER (right split pane)
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-panel-container {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+  min-width: 320px;
+  max-width: 900px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT PANEL INNER
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-panel {
+  @apply flex h-full flex-col;
+}
+
+.artifact-panel-header {
+  @apply flex h-12 shrink-0 items-center gap-3
+         border-b border-border px-4;
+}
+
+.artifact-panel-body {
+  @apply min-h-0 flex-1 overflow-y-auto px-6 py-5;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FILES SIDEBAR (inline embedded panel — mirrors session sidebar)
+   Styled inline in the component using Tailwind utilities.
+   Nothing needed here — placeholder section kept for clarity.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT CARD (shown inside chat messages)
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-chat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 480px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  user-select: none;
+}
+
+.artifact-chat-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.artifact-chat-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.artifact-chat-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.artifact-chat-card-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+}
+
+.artifact-chat-card-download:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-4);
+  color: var(--text-1);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT PANEL TOGGLE (Preview / Code buttons)
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  flex-shrink: 0;
+}
+
+.artifact-panel-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+  white-space: nowrap;
+}
+
+.artifact-panel-toggle-btn:hover {
+  color: var(--text-2);
+  background: var(--surface-4);
+}
+
+.artifact-panel-toggle-btn-active {
+  color: var(--text-1) !important;
+  background: var(--surface-1) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT PANEL ACTION BUTTON (Copy — with text label)
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-panel-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+}
+
+.artifact-panel-action-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-4);
+  color: var(--text-1);
+}
+
+.artifact-panel-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT PANEL RAW CODE VIEW
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-panel-raw {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-1);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SIDEBAR FOOTER NAV BUTTONS  (Library / Projects)
+───────────────────────────────────────────────────────────────────────────── */
+
+.sidebar-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-3);
+  text-decoration: none;
+  transition: background 0.1s, color 0.1s;
+}
+
+.sidebar-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-2);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SESSION CONTEXT-MENU DROPDOWN  (Portal — rendered in document.body)
+───────────────────────────────────────────────────────────────────────────── */
+
+.session-dropdown {
+  position: fixed;
+  z-index: 9999;
+  min-width: 164px;
+  background: #1f1f1f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: fadeInScale 0.1s ease-out;
+  transform-origin: top right;
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.94) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0);     }
+}
+
+.session-dropdown-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-2);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.08s, color 0.08s;
+  text-align: left;
+  border: none;
+}
+
+.session-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+}
+
+.session-dropdown-item-danger     { color: var(--danger); }
+.session-dropdown-item-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.session-dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 3px 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   LIBRARY PAGE
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Legacy grid kept for compatibility */
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+/* New flat-list layout used by the redesigned library page */
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.library-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.library-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.library-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+/* Type badge inside library cards (text pill: HTML / MD / Code) */
+.library-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* Filter tabs shown below library header */
+.library-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.library-filter-tab:hover {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.library-filter-tab-active {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-1);
+}
+
+.library-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.library-filter-tab-active .library-filter-count {
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--text-2);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PROJECTS PAGE
+───────────────────────────────────────────────────────────────────────────── */
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.project-card:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SHARED PAGE-LEVEL BUTTONS  (reused across Library / Projects pages)
+───────────────────────────────────────────────────────────────────────────── */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--accent-strong);
+  color: #0a0a0a;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.btn-primary:hover   { background: var(--accent); }
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.btn-secondary:hover { background: var(--surface-3); color: var(--text-1); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT PANEL — HTML iframe renderer
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-panel-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #ffffff;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ARTIFACT CHAT CARD — type badge pill
+───────────────────────────────────────────────────────────────────────────── */
+
+.artifact-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  background: var(--surface-4);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  flex-shrink: 0;
+  line-height: 1.5;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DOWNLOAD MENU (shared dropdown for Markdown / PDF)
+───────────────────────────────────────────────────────────────────────────── */
+
+.download-menu-root {
+  position: relative;
+  display: inline-flex;
+}
+
+.download-menu-popover {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 200;
+  min-width: 160px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: dropdown-in 0.12s ease;
+}
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.download-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.download-menu-item:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   HIGHLIGHT.JS — CUSTOM MONOCHROME THEME
+   Strictly grayscale — no color, no indigo, no green, no orange.
+───────────────────────────────────────────────────────────────────────────── */
+
+.hljs {
+  color: #b8b8b8;
+  background: transparent;
+}
+
+/* Keywords — keyword, selector-tag, literal, section, link */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-link {
+  color: #e4e4e4;
+  font-weight: 500;
+}
+
+/* Strings — string, title, name, quote */
+.hljs-string,
+.hljs-title,
+.hljs-name,
+.hljs-quote {
+  color: #a8a8a8;
+}
+
+/* Type / class names */
+.hljs-type,
+.hljs-class .hljs-title {
+  color: #dddddd;
+}
+
+/* Built-in functions and symbols */
+.hljs-built_in,
+.hljs-symbol {
+  color: #cccccc;
+}
+
+/* Numbers and boolean values */
+.hljs-number,
+.hljs-bullet,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag .hljs-attr {
+  color: #c8c8c8;
+}
+
+/* Operators and punctuation */
+.hljs-operator,
+.hljs-punctuation {
+  color: #777777;
+}
+
+/* Attributes / HTML attributes */
+.hljs-attr,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-pseudo {
+  color: #999999;
+}
+
+/* Function/method names */
+.hljs-function .hljs-title,
+.hljs-title.function_ {
+  color: #d8d8d8;
+}
+
+/* Parameters */
+.hljs-params {
+  color: #a0a0a0;
+}
+
+/* Comments — dimmed, italic */
+.hljs-comment,
+.hljs-doctag,
+.hljs-formula {
+  color: #555555;
+  font-style: italic;
+}
+
+/* Meta / preprocessor directives */
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-tag {
+  color: #888888;
+}
+
+/* Addition / deletion (diff) */
+.hljs-addition {
+  color: #aaaaaa;
+}
+
+.hljs-deletion {
+  color: #777777;
+}
+
+/* Emphasis / strong in markdown */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TOOL BLOCK  —  generic, consistent UI for every tool call
+   web search · date check · (future: sandbox, computer use, research …)
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Wrapper for one or more consecutive tool blocks above a response */
+.tool-events-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  animation: fadeIn 0.18s ease-out;
+}
+
+/* ── The block card ── */
+.tool-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-1);
+  overflow: hidden;
+  max-width: 520px;
+  animation: fadeIn 0.18s ease-out;
+}
+
+/* ── Header row (always visible) ── */
+.tb-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  min-height: 32px;
+}
+
+/* Clickable header variant — used when there is expandable body content */
+button.tb-header-clickable {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  min-height: 32px;
+  transition: background 0.12s;
+}
+
+button.tb-header-clickable:hover {
+  background: var(--surface-2);
+}
+
+button.tb-header-clickable:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* ── Status indicators ── */
+.tb-spinner {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--text-3);
+  animation: tbSpin 0.75s linear infinite;
+}
+
+@keyframes tbSpin {
+  to { transform: rotate(360deg); }
+}
+
+.tb-check {
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tb-error-icon {
+  color: var(--danger);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Content pieces ── */
+.tb-icon {
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tb-title {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/* Pill badge — source count, time string, etc. */
+.tb-badge {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Italic query / secondary subtitle */
+.tb-subtitle {
+  color: var(--text-3);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Expand / collapse chevron — pushed to the far right */
+.tb-chevron {
+  margin-left: auto;
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.15s ease;
+}
+
+/* ── Expandable body ── */
+.tb-body {
+  border-top: 1px solid var(--border);
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* ── Source items inside the body ── */
+.tb-source-item {
+  display: block;
+  text-decoration: none;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+.tb-source-item:last-child {
+  border-bottom: none;
+}
+
+.tb-source-item:hover {
+  background: var(--surface-2);
+}
+
+.tb-source-domain-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 2px;
+}
+
+.tb-source-favicon {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.tb-source-domain {
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.tb-source-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+  margin: 0 0 2px 0;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.tb-source-snippet {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.5;
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
