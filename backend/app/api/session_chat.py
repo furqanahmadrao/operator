@@ -32,11 +32,19 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.agent.agent import agent_with_search, agent_without_search
+from app.agent.agent import (
+    agent_thinking_no_search,
+    agent_thinking_with_search,
+    agent_with_search,
+    agent_without_search,
+)
 from app.agent.context import build_messages_for_turn
+from app.agent.deep_research import generate_clarifying_questions, run_deep_research_graph
 from app.agent.events import (
     TurnAccumulator,
     sse_artifact_created,
+    sse_artifact_updated,
+    sse_clarifying_questions,
     sse_error,
     sse_message_ids,
     sse_search_results,
@@ -115,16 +123,161 @@ async def session_chat(session_id: str, request: SessionChatRequest):
             project_system_prompt=project_system_prompt,
         )
 
+        # ── 3a. Deep research: Call 1 — generate clarifying questions ────────
+        if request.deep_research_enabled and request.clarifications is None:
+            try:
+                questions = await generate_clarifying_questions(request.content)
+            except Exception as exc:  # noqa: BLE001
+                log.exception("Failed to generate clarifying questions: %s", exc)
+                yield sse_error(f"Could not generate clarifying questions: {exc}")
+                yield "data: [DONE]\n\n"
+                return
+
+            # Persist only the user message for now (no assistant message yet)
+            user_msg_id = await session_service.save_message(
+                session_id, "user", request.content
+            )
+            await session_service.auto_title_session(session_id, request.content)
+            await session_service.touch_session(session_id)
+
+            yield sse_clarifying_questions(questions)
+            yield sse_message_ids(user_msg_id, "")   # empty assistant id — not saved yet
+            yield "data: [DONE]\n\n"
+            return
+
+        # ── 3b. Deep research: Call 2 — run full research with answers ────
+        if request.deep_research_enabled and request.clarifications is not None:
+            import asyncio as _asyncio  # noqa: PLC0415
+
+            # Save user message; we'll link the artifact to the assistant message
+            user_msg_id = await session_service.save_message(
+                session_id, "user", request.content
+            )
+
+            # Create a placeholder assistant message now so we can link the artifact
+            asst_msg_id = await session_service.save_message(
+                session_id,
+                "assistant",
+                "",  # will be updated after research completes
+            )
+
+            # Emit message IDs immediately so the client knows them from the start
+            yield sse_message_ids(user_msg_id, asst_msg_id)
+            # Emit initial token so the client shows something
+            yield sse_token("Starting deep research…\n\n")
+
+            sse_queue: _asyncio.Queue = _asyncio.Queue()
+            artifact_result: dict | None = None
+            graph_exception: Exception | None = None
+            final_state: dict = {}
+
+            # --- Concurrent: run graph + drain queue simultaneously for real-time SSE ---
+            async def _run_graph() -> None:
+                nonlocal final_state, graph_exception
+                try:
+                    final_state = await run_deep_research_graph(
+                        session_id=session_id,
+                        query=request.content,
+                        clarifications=request.clarifications,
+                        assistant_message_id=asst_msg_id,
+                        sse_queue=sse_queue,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    graph_exception = exc
+                finally:
+                    await sse_queue.put(None)  # sentinel to stop drain loop
+
+            graph_task = _asyncio.create_task(_run_graph())
+
+            # Drain the queue in real-time while the graph runs
+            try:
+                while True:
+                    try:
+                        item = await _asyncio.wait_for(sse_queue.get(), timeout=0.1)
+                    except _asyncio.TimeoutError:
+                        if graph_task.done():
+                            break
+                        continue
+                    if item is None:  # sentinel — graph finished
+                        break
+                    if isinstance(item, dict) and "_artifact" in item:
+                        artifact_result = item["_artifact"]
+                        yield sse_artifact_created(artifact_result)
+                    else:
+                        yield item  # already-formatted SSE string
+
+                # Drain any remaining items after sentinel
+                while not sse_queue.empty():
+                    item = sse_queue.get_nowait()
+                    if item is None:
+                        continue
+                    if isinstance(item, dict) and "_artifact" in item:
+                        artifact_result = item["_artifact"]
+                        yield sse_artifact_created(artifact_result)
+                    else:
+                        yield item
+
+            finally:
+                if not graph_task.done():
+                    graph_task.cancel()
+                    try:
+                        await graph_task
+                    except (_asyncio.CancelledError, Exception):
+                        pass
+
+            if graph_exception:
+                log.exception("Deep research graph error: %s", graph_exception)
+                yield sse_error(f"Deep research failed: {graph_exception}")
+                yield "data: [DONE]\n\n"
+                return
+
+            # Build a brief summary token for the assistant message body
+            report = final_state.get("report", "")
+            summary_lines = report.splitlines()
+            summary = " ".join(summary_lines[:4]).strip() if summary_lines else report[:300]
+            if len(summary) > 300:
+                summary = summary[:300] + "…"
+            if artifact_result:
+                summary = f"Research complete. See the **{artifact_result.get('title', 'report')}** artifact."
+
+            # Emit the summary as the visible response token
+            yield sse_token(summary)
+
+            # Update assistant message body with summary
+            await session_service.update_message_content(asst_msg_id, summary)
+
+            # Link artifact to assistant message
+            if artifact_result:
+                await artifact_service.update_artifact_source_message(
+                    artifact_result["id"], asst_msg_id
+                )
+                await session_service.update_message_artifact(
+                    asst_msg_id, artifact_result["id"]
+                )
+
+            await session_service.auto_title_session(session_id, request.content)
+            await session_service.touch_session(session_id)
+            yield "data: [DONE]\n\n"
+            return
+
         # ── 3. Select agent and build per-request config ──────────────────
-        agent = (
-            agent_with_search if request.web_search_enabled else agent_without_search
-        )
+        # 4-way matrix: think_enabled × web_search_enabled
+        if request.think_enabled:
+            agent = (
+                agent_thinking_with_search
+                if request.web_search_enabled
+                else agent_thinking_no_search
+            )
+            recursion_limit = 16  # thinking turns need extra headroom for <think> blocks
+        else:
+            agent = (
+                agent_with_search if request.web_search_enabled else agent_without_search
+            )
+            recursion_limit = 12
+
         config = {
             "configurable": {"session_id": session_id},
-            # Safety guard: prevent runaway tool-calling loops.
-            # Most turns complete in 1-3 iterations; 12 gives ample headroom
-            # for multi-step research tasks without runaway loops.
-            "recursion_limit": 12,
+            "recursion_limit": recursion_limit,
         }
 
         # ── 4. Stream agent events → SSE ──────────────────────────────────
@@ -167,6 +320,12 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                                         yield sse_thinking(think_text)
 
                 # ── Tool start — show activity spinner ───────────────────
+                # Only web_search gets an activity spinner; internal tools
+                # (create_artifact, list_session_artifacts, get_current_datetime)
+                # must NOT emit tool_activity events here — the frontend has no
+                # dedicated handler for them and incorrectly maps them to the
+                # web_search spinner, causing a permanent "Searching…" state.
+                # Artifact creation is surfaced via sse_artifact_created instead.
                 elif ev_type == "on_tool_start":
                     tool_input = event["data"].get("input", {})
                     if ev_name == "web_search":
@@ -175,16 +334,6 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                             "running",
                             query=tool_input.get("query", ""),
                         )
-                    elif ev_name == "create_artifact":
-                        yield sse_tool_activity(
-                            "create_artifact",
-                            "running",
-                            title=tool_input.get("title", ""),
-                        )
-                    elif ev_name == "list_session_artifacts":
-                        yield sse_tool_activity("list_session_artifacts", "running")
-                    elif ev_name == "get_current_datetime":
-                        yield sse_tool_activity("get_current_datetime", "running")
 
                 # ── Tool end — emit structured results or artifact ────────
                 elif ev_type == "on_tool_end":
@@ -227,20 +376,68 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                         try:
                             data = json.loads(raw_output)
                             if data.get("status") == "created":
-                                acc.created_artifact_ids.append(data["artifact_id"])
+                                artifact_id = data["artifact_id"]
+                                acc.created_artifact_ids.append(artifact_id)
+                                # Emit immediately so the panel opens mid-stream
+                                artifact = await artifact_service.get_artifact(artifact_id)
+                                if artifact:
+                                    yield sse_artifact_created(artifact)
                         except (json.JSONDecodeError, KeyError):
                             log.warning(
                                 "Could not parse create_artifact output: %r",
                                 raw_output,
                             )
 
-                    # Completion acknowledgement for informational tools
-                    elif ev_name in ("list_session_artifacts", "get_current_datetime"):
-                        yield sse_tool_activity(ev_name, "completed")
+                    elif ev_name == "update_artifact":
+                        try:
+                            data = json.loads(raw_output)
+                            if data.get("status") == "updated":
+                                artifact_id = data["artifact_id"]
+                                acc.updated_artifact_ids.append(artifact_id)
+                                # Emit immediately so the panel updates mid-stream
+                                artifact = await artifact_service.get_artifact(artifact_id)
+                                if artifact:
+                                    yield sse_artifact_updated(artifact)
+                        except (json.JSONDecodeError, KeyError):
+                            log.warning(
+                                "Could not parse update_artifact output: %r",
+                                raw_output,
+                            )
+
+                    # list_session_artifacts and get_current_datetime are
+                    # internal lookups with no dedicated frontend indicator —
+                    # no SSE event needed on completion.
 
         except Exception as error:  # noqa: BLE001
             log.exception("Agent stream error: %s", error)
-            yield sse_error(str(error))
+            # Translate raw HTTP/library error codes to user-readable messages
+            # so the frontend banner is informative rather than cryptic.
+            raw = str(error)
+            if any(code in raw for code in ("502", "503", "504")):
+                user_msg = (
+                    "The AI service is temporarily unavailable "
+                    "(gateway error). Please try again in a moment."
+                )
+            elif "timed out" in raw.lower() or "timeout" in raw.lower():
+                user_msg = (
+                    "The AI service took too long to respond. "
+                    "It may be under heavy load — please try again."
+                )
+            elif "401" in raw or "403" in raw:
+                user_msg = (
+                    "API authentication failed. "
+                    "Please check that your NVIDIA API key is valid."
+                )
+            elif "429" in raw:
+                user_msg = "Rate limit reached. Please wait a moment and try again."
+            elif "chat_template_kwargs" in raw or "unexpected keyword" in raw:
+                user_msg = (
+                    "LLM configuration error: an unsupported parameter was sent. "
+                    "Please restart the backend server."
+                )
+            else:
+                user_msg = f"Agent error: {raw}"
+            yield sse_error(user_msg)
             yield "data: [DONE]\n\n"
             return
 
@@ -271,18 +468,21 @@ async def session_chat(session_id: str, request: SessionChatRequest):
             session_id, "assistant", clean_response, metadata_json=metadata_json
         )
 
-        # ── 7. Link tool-created artifacts + emit artifact_created ─────────
+        # ── 7. Link tool-created artifacts to the saved message ────────────
         # (a) Artifacts created via the create_artifact tool
+        # Note: sse_artifact_created was already emitted mid-stream in on_tool_end
         for artifact_id in acc.created_artifact_ids:
             await artifact_service.update_artifact_source_message(
                 artifact_id, asst_msg_id
             )
             await session_service.update_message_artifact(asst_msg_id, artifact_id)
-            artifact = await artifact_service.get_artifact(artifact_id)
-            if artifact:
-                yield sse_artifact_created(artifact)
 
-        # (b) Fallback XML-extracted artifact
+        # (b) Artifacts updated via the update_artifact tool
+        # Note: sse_artifact_updated was already emitted mid-stream in on_tool_end
+        for artifact_id in acc.updated_artifact_ids:
+            await session_service.update_message_artifact(asst_msg_id, artifact_id)
+
+        # (c) Fallback XML-extracted artifact (only if tool was not called)
         if fallback_artifact_data:
             artifact = await artifact_service.create_artifact(
                 session_id=session_id,

@@ -1,235 +1,140 @@
-# Agent Coding Guidelines
+# AGENTS.md
+Repository guidance for coding agents.
+Scope: `frontend/` (Next.js + TypeScript) and `backend/` (FastAPI + Python).
 
-This file provides guidelines for AI agents working on this codebase.
+## Project Snapshot
+- Frontend: Next.js 16, React 19, TypeScript, Tailwind v4
+- Backend: FastAPI, Pydantic v2, aiosqlite
+- Runtime DB: `backend/data/agent.db`
+- API pattern: REST + SSE streaming
 
-## Project Overview
-
-This is a premium chat application with a Next.js frontend and FastAPI backend. The stack includes:
-- **Frontend**: Next.js 16.1.6, TypeScript, Tailwind CSS v4
-- **Backend**: FastAPI, Python 3.12
-- **AI Model**: NVIDIA API with deepseek-ai/deepseek-v3.1-terminus
+## Cursor/Copilot Rules
+Searched for rule files and found none:
+- `.cursorrules` -> not present
+- `.cursor/rules/` -> not present
+- `.github/copilot-instructions.md` -> not present
+If these files are added later, treat them as supplemental instructions.
 
 ## Build, Lint, and Test Commands
+Run commands from the correct working directory.
 
-### Frontend (Next.js)
-```bash
-cd frontend
+### Frontend (`frontend/`)
+- Install dependencies: `npm install`
+- Run dev server: `npm run dev`
+- Build production bundle: `npm run build`
+- Run production server: `npm run start`
+- Run linter: `npm run lint`
+- Type-check: `npx tsc --noEmit`
 
-# Development
-npm run dev              # Start development server
+### Backend (`backend/`)
+- Create virtual env: `python -m venv .venv`
+- Activate (PowerShell): `.\.venv\Scripts\Activate.ps1`
+- Install dependencies: `pip install -r requirements.txt`
+- Run API locally: `uvicorn app.main:app --reload --port 8000`
+- Health check: `curl http://localhost:8000/health`
 
-# Build and Production
-npm run build            # Build production bundle
-npm run start            # Start production server
+### Tests and Single-Test Execution
+Current state:
+- No frontend test script is defined in `frontend/package.json`
+- No backend test config exists (`pytest.ini` / `pyproject.toml` not present)
 
-# Linting
-npm run lint             # Run ESLint
+If tests are introduced, prefer these single-test patterns:
+- Vitest file: `npx vitest run path/to/file.test.ts`
+- Vitest test name: `npx vitest run path/to/file.test.ts -t "test name"`
+- Jest test name: `npx jest path/to/file.test.ts -t "test name"`
+- Pytest single test: `pytest tests/test_file.py::test_case_name -q`
 
-# Type checking
-npx tsc --noEmit         # TypeScript type checking
-```
-
-### Backend (FastAPI)
-```bash
-cd backend
-
-# Setup virtual environment (Windows)
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-
-# Development
-uvicorn app.main:app --reload --port 8000
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Health check
-curl http://localhost:8000/health
-```
-
-### Running Individual Tests
-Currently no test framework is configured. When adding tests:
-- Use Jest/Vitest for frontend tests
-- Use pytest for backend tests
-- Follow existing patterns when adding test files
+Current minimum verification before merge:
+- Frontend changes: `npm run lint` and `npx tsc --noEmit`
+- Backend changes: run API and verify `/health`
 
 ## Code Style Guidelines
+Prefer existing local patterns over personal preference.
 
-### TypeScript/React Conventions
+### Imports and Module Boundaries
+TypeScript:
+- Use `@/*` absolute imports for internal modules
+- Group imports: framework/vendor first, then local modules
+- Use `import type` for type-only imports where practical
+- Keep API client logic in `frontend/src/lib/*`
+- Keep UI components in `frontend/src/components/*`
 
-**Imports**
-- Use absolute imports with `@/*` alias (configured in tsconfig.json)
-- Group imports: external libraries first, then internal modules
-- Example from `src/lib/chat-api.ts`:
+Python:
+- Group imports: stdlib, third-party, local `app.*`
+- Keep routers focused on transport/HTTP behavior
+- Put domain logic in `backend/app/services/*`
 
-```typescript
-export type ChatRole = "user" | "assistant" | "system";
-```
+### Formatting
+TypeScript:
+- Follow ESLint rules in `frontend/eslint.config.mjs`
+- Existing style uses semicolons and double quotes
+- Keep multiline arrays/objects/functions trailing-comma friendly
 
-**Naming Conventions**
-- PascalCase for components and types (`ChatShell`, `ChatMessage`)
-- camelCase for functions and variables (`streamChatCompletion`, `onToken`)
-- UPPER_CASE for constants (`API_BASE_URL`)
-- Use descriptive, meaningful names
+Python:
+- Follow PEP 8 and 4-space indentation
+- Use type hints on function signatures
+- Keep request-path code asynchronous and non-blocking
 
-**Error Handling**
-- Use TypeScript's strict mode (enabled in tsconfig)
-- Throw meaningful Error objects with descriptive messages
-- Handle async errors with try/catch
+### Types and Schemas
+TypeScript:
+- Define API payload types in `frontend/src/lib/*`
+- Use literal unions for finite event values
+- Avoid `any`; if needed, isolate casts and keep scope narrow
 
-**Component Structure**
-- Functional components with TypeScript interfaces
-- Use arrow function syntax for components
-- Export default for page components
+Python:
+- Use Pydantic models for request/response contracts
+- Enforce constraints with `Field(...)`
+- Use `Literal[...]` for fixed-value fields where possible
 
-### Python/FastAPI Conventions
+### Naming
+- Components/classes/types: `PascalCase`
+- TypeScript vars/functions/hooks: `camelCase`
+- Python vars/functions: `snake_case`
+- Constants: `UPPER_SNAKE_CASE`
+- Keep API/DB snake_case fields when mirroring backend payloads
 
-**Imports**
-- Group imports: standard library, third-party, local modules
-- Use absolute imports for local modules
-- Example from `app/api/chat.py`:
+### Error Handling
+Frontend:
+- Throw explicit `Error` for non-OK HTTP responses
+- Treat abort/cancel paths as non-fatal flow
+- Favor graceful UI fallbacks over hard crashes
 
-```python
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+Backend:
+- Use `HTTPException` for validation/business errors
+- In SSE routes, emit structured error events
+- Always terminate streams with `data: [DONE]`
+- Catch broad exceptions only at stream boundaries
 
-from app.api.schemas import ChatRequest
-from app.services.chat_service import chat_service
-```
+### API and Streaming Rules
+- Emit SSE events as `data: <json>\n\n`
+- Preserve current event names and payload shapes for compatibility
+- Do not break existing endpoints without migration notes
 
-**Naming Conventions**
-- snake_case for functions and variables (`stream_reply`, `event_generator`)
-- PascalCase for classes (`ChatService`)
-- UPPER_CASE for constants
+### Database Rules
+- Use `backend/app/database.py` helpers/context managers
+- Respect `_DDL` and idempotent `_MIGRATIONS` startup pattern
+- Avoid destructive schema changes without safe migration steps
 
-**Error Handling**
-- Use specific exception types when possible
-- Catch exceptions at appropriate levels
-- Return HTTP status codes with meaningful messages
-- Example from `app/api/chat.py`:
+### Environment and Security
+- Never commit secrets from `.env` files
+- Backend settings load from `backend/.env` via pydantic-settings
+- Frontend public env vars must start with `NEXT_PUBLIC_`
+- Validate external input before persisting or rendering
 
-```python
-try:
-    async for token in chat_service.stream_reply(request.messages):
-        payload = json.dumps({"type": "token", "content": token})
-        yield f"data: {payload}\n\n"
-except Exception as error:  # noqa: BLE001
-    payload = json.dumps({"type": "error", "message": str(error)})
-    yield f"data: {payload}\n\n"
-```
+## Working Rules for Agents
+- Read adjacent files before editing and mirror local patterns
+- Keep changes scoped; avoid drive-by refactors
+- Do not edit generated/runtime folders (`backend/.venv`, `.next`)
+- Keep FastAPI routers thin and move reusable logic into services
 
-**Type Annotations**
-- Use Python type hints consistently
-- Leverage Pydantic for request/response validation
-- Use `AsyncGenerator` for streaming responses
+## Quick File Map
+- Frontend entry: `frontend/src/app/page.tsx`
+- Frontend layout: `frontend/src/app/layout.tsx`
+- Main UI shell: `frontend/src/components/chat-shell.tsx`
+- Frontend API clients: `frontend/src/lib/*.ts`
+- FastAPI bootstrap: `backend/app/main.py`
+- API schemas: `backend/app/api/schemas.py`
+- Services: `backend/app/services/*.py`
+- DB layer: `backend/app/database.py`
 
-### File Organization
-
-**Frontend Structure**
-```
-frontend/src/
-├── app/                 # Next.js App Router pages
-├── components/         # Reusable React components
-│   ├── shell/          # Layout components
-│   └── chat-shell.tsx  # Main chat interface
-├── lib/                # Utility functions and API clients
-└── styles/             # Global styles
-```
-
-**Backend Structure**
-```
-backend/app/
-├── api/                # FastAPI route handlers
-├── services/           # Business logic layer
-├── config/            # Configuration and settings
-└── schemas.py         # Pydantic models
-```
-
-## Formatting Rules
-
-### TypeScript/JavaScript
-- Use ESLint with Next.js configuration
-- Follow Prettier defaults (when added)
-- Line length: 80-100 characters
-- Use semicolons
-- Double quotes for strings
-
-### Python
-- Follow PEP 8 conventions
-- Line length: 79 characters
-- Use 4 spaces for indentation
-- Blank lines between functions/classes
-- Docstrings for public functions
-
-## Development Workflow
-
-### Adding New Features
-1. **Frontend**: Add components in `frontend/src/components/`
-2. **Backend**: Add API routes in `backend/app/api/` and services in `backend/app/services/`
-3. **Schemas**: Update `backend/app/api/schemas.py` for new data models
-4. **Testing**: Add tests alongside implementation
-
-### Code Quality Checks
-- Run `npm run lint` before committing frontend changes
-- Ensure TypeScript compilation passes (`npx tsc --noEmit`)
-- Check Python imports and syntax
-- Verify API endpoints work correctly
-
-### Environment Variables
-- Frontend: Use `frontend/.env.local` for local development
-- Backend: Use `backend/.env` for configuration
-- Follow existing patterns for API base URLs and keys
-
-## Architecture Patterns
-
-### Frontend Patterns
-- **Streaming**: Use Server-Sent Events for real-time updates
-- **State Management**: Local component state (no external stores yet)
-- **Styling**: Tailwind CSS with utility-first approach
-
-### Backend Patterns
-- **API Design**: RESTful endpoints with streaming support
-- **Service Layer**: Business logic separated from route handlers
-- **Configuration**: Environment-based settings with Pydantic
-- **Error Handling**: Structured error responses with appropriate HTTP codes
-
-### Integration Patterns
-- **API Communication**: HTTP streaming between frontend and backend
-- **Error Propagation**: Consistent error handling across layers
-- **Type Safety**: Shared type definitions between frontend and backend
-
-## Best Practices
-
-### General
-- Write clear, self-documenting code
-- Add comments for complex logic
-- Keep functions small and focused
-- Follow the Single Responsibility Principle
-
-### Security
-- Never commit API keys or secrets
-- Validate all user inputs
-- Use environment variables for sensitive data
-- Implement proper CORS configuration
-
-### Performance
-- Use streaming for large responses
-- Implement proper error boundaries
-- Optimize bundle size with code splitting
-- Cache appropriately
-
-## Common Issues to Avoid
-
-### Frontend
-- Avoid inline styles; use Tailwind classes
-- Don't mutate state directly; use functional updates
-- Handle loading states properly
-- Implement proper error boundaries
-
-### Backend
-- Don't block the event loop with synchronous operations
-- Handle streaming responses correctly
-- Validate all inputs with Pydantic
-- Implement proper exception handling
-
-This file should be updated as the codebase evolves and new patterns emerge.
+Update this file when scripts, tooling, or architecture change.

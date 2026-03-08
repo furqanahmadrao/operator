@@ -71,6 +71,7 @@ class ArtifactSchema(BaseModel):
     type: str
     title: str
     content: str
+    version: int = 1
     created_at: str
     updated_at: str
 
@@ -83,6 +84,16 @@ class ArtifactWithSessionSchema(ArtifactSchema):
 class ArtifactUpdate(BaseModel):
     title: str | None = None
     content: str | None = None
+
+
+class ArtifactRevisionSchema(BaseModel):
+    id: str
+    artifact_id: str
+    version: int
+    title: str
+    content: str
+    source_message_id: str | None = None
+    created_at: str
 
 
 # ── Project schemas ────────────────────────────────────────────────────────────
@@ -121,6 +132,9 @@ class ProjectSchema(BaseModel):
 class SessionChatRequest(BaseModel):
     content: str = Field(min_length=1)
     web_search_enabled: bool = True
+    think_enabled: bool = False
+    deep_research_enabled: bool = False
+    clarifications: dict[str, str] | None = None
 
 
 # ── Web search ─────────────────────────────────────────────────────────────────

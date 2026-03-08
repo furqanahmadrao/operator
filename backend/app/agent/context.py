@@ -15,6 +15,33 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from app.config.system_prompt import build_system_prompt
 from app.services import session_service
 
+_MAX_CONTEXT_CHARS = 40_000
+
+
+def _trim_messages_by_chars(
+    messages: list[BaseMessage],
+    max_chars: int = _MAX_CONTEXT_CHARS,
+) -> list[BaseMessage]:
+    """Keep the system message (always) + newest messages that fit within max_chars.
+
+    Strategy: walk backwards through non-system messages, keeping them until
+    we've used max_chars worth of characters.  Always keeps at least the
+    last user message so the current turn is never lost.
+    """
+    system = messages[0] if messages and isinstance(messages[0], SystemMessage) else None
+    system_chars = len(system.content) if system and isinstance(system.content, str) else 0
+    remaining = max_chars - system_chars
+    others = messages[1:] if system else messages
+    kept: list[BaseMessage] = []
+    for msg in reversed(others):
+        chars = len(msg.content) if isinstance(msg.content, str) else 500
+        if remaining - chars >= 0 or not kept:
+            kept.insert(0, msg)
+            remaining -= chars
+        else:
+            break
+    return ([system] if system else []) + kept
+
 
 async def build_messages_for_turn(
     session_id: str,
@@ -64,4 +91,8 @@ async def build_messages_for_turn(
         # prompt ourselves rather than re-injecting stale history prompts.
 
     messages.append(HumanMessage(content=user_content))
+
+    # ── Context trimming: guard against runaway token counts ─────────────────
+    messages = _trim_messages_by_chars(messages)
+
     return messages

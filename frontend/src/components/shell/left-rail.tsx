@@ -1,41 +1,103 @@
-import { CircleHelp, MessageSquarePlus, Search, Settings, Sparkles } from "lucide-react";
+"use client";
 
-export function LeftRail() {
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Files, LayoutGrid, MessageSquarePlus, Settings, User, Zap } from "lucide-react";
+
+interface LeftRailProps {
+  /** Called when the user clicks the chat/history icon */
+  onToggleHistory: () => void;
+  /** Whether the session history panel is currently open */
+  historyOpen: boolean;
+}
+
+const USER_INITIALS = "FA";
+const USER_NAME = "Furqan";
+
+export function LeftRail({ onToggleHistory, historyOpen }: LeftRailProps) {
+  const pathname = usePathname();
+
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-16 flex-col items-center justify-between border-r border-border bg-surface-1 py-3 md:flex">
-      <div className="flex flex-col items-center gap-2">
-        {/* Workspace avatar */}
-        <button
-          type="button"
-          aria-label="Open workspace"
-          title="Agent workspace"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-3 text-[13px] font-bold tracking-tight text-text-1 transition-all duration-150 hover:bg-surface-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-        >
-          AG
-        </button>
-
-        <div className="my-1 h-px w-6 bg-border" />
-
-        <button type="button" aria-label="New session" title="New session" className="rail-btn rail-btn-active">
-          <MessageSquarePlus size={15} />
-        </button>
-
-        <button type="button" aria-label="Search" title="Search" className="rail-btn">
-          <Search size={15} />
-        </button>
-
-        <button type="button" aria-label="Agents" title="Agents" className="rail-btn">
-          <Sparkles size={15} />
-        </button>
+    <aside className="hidden h-full w-12 shrink-0 flex-col items-center border-r border-border bg-bg md:flex">
+      {/* Logo — blue flash (Zap) */}
+      <div className="flex h-12 w-full shrink-0 items-center justify-center border-b border-border">
+        <Zap size={20} className="fill-accent text-accent" strokeWidth={0} />
       </div>
 
-      <div className="flex flex-col items-center gap-2">
-        <button type="button" aria-label="Help" title="Help" className="rail-btn">
-          <CircleHelp size={15} />
+      {/* Nav items */}
+      <nav className="flex flex-1 flex-col w-full">
+        {/* Chat / Session history toggle */}
+        <button
+          type="button"
+          onClick={onToggleHistory}
+          className={`relative flex h-12 w-full items-center justify-center transition-colors hover:bg-black/5 focus-visible:outline-none ${
+            historyOpen ? "text-accent" : "text-text-3 hover:text-text-1"
+          }`}
+          aria-label="Chat history"
+          title="Chat history"
+        >
+          {historyOpen && <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" />}
+          <MessageSquarePlus size={18} />
         </button>
-        <button type="button" aria-label="Settings" title="Settings" className="rail-btn">
-          <Settings size={15} />
-        </button>
+
+        {/* Projects */}
+        <Link
+          href="/projects"
+          className={`relative flex h-12 w-full items-center justify-center transition-colors hover:bg-black/5 focus-visible:outline-none ${
+            pathname.startsWith("/projects") ? "text-accent" : "text-text-3 hover:text-text-1"
+          }`}
+          aria-label="Projects"
+          title="Projects"
+        >
+          {pathname.startsWith("/projects") && (
+            <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" />
+          )}
+          <LayoutGrid size={18} />
+        </Link>
+
+        {/* Library */}
+        <Link
+          href="/library"
+          className={`relative flex h-12 w-full items-center justify-center transition-colors hover:bg-black/5 focus-visible:outline-none ${
+            pathname === "/library" ? "text-accent" : "text-text-3 hover:text-text-1"
+          }`}
+          aria-label="Artifact Library"
+          title="Artifact Library"
+        >
+          {pathname === "/library" && (
+            <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" />
+          )}
+          <Files size={18} />
+        </Link>
+      </nav>
+
+      {/* Bottom nav */}
+      <div className="flex w-full flex-col border-t border-border">
+        <Link
+          href="/settings"
+          className={`relative flex h-12 w-full items-center justify-center transition-colors hover:bg-black/5 focus-visible:outline-none ${
+            pathname.startsWith("/settings") ? "text-accent" : "text-text-3 hover:text-text-1"
+          }`}
+          aria-label="Settings"
+          title="Settings"
+        >
+          {pathname.startsWith("/settings") && (
+            <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" />
+          )}
+          <Settings size={18} />
+        </Link>
+        <Link
+          href="/settings"
+          className="flex h-12 w-full items-center justify-center transition-colors hover:bg-black/5 focus-visible:outline-none"
+          aria-label={`Signed in as ${USER_NAME}`}
+          title={USER_NAME}
+        >
+          <div className={`flex h-6 w-6 items-center justify-center text-[9px] font-bold tracking-tight ${
+            pathname.startsWith("/settings") ? "bg-accent text-white" : "bg-text-1 text-bg"
+          }`}>
+            {USER_INITIALS}
+          </div>
+        </Link>
       </div>
     </aside>
   );

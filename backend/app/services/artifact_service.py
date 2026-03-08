@@ -65,8 +65,8 @@ async def create_artifact(
         await db.execute(
             """
             INSERT INTO artifacts
-              (id, session_id, source_message_id, type, title, content, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              (id, session_id, source_message_id, type, title, content, version, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
             """,
             (
                 artifact_id,
@@ -79,6 +79,15 @@ async def create_artifact(
                 now,
             ),
         )
+        revision_id = str(uuid.uuid4())
+        await db.execute(
+            """
+            INSERT INTO artifact_revisions
+              (id, artifact_id, version, title, content, source_message_id, created_at)
+            VALUES (?, ?, 1, ?, ?, ?, ?)
+            """,
+            (revision_id, artifact_id, title, content, source_message_id, now),
+        )
         await db.commit()
     return {
         "id": artifact_id,
@@ -87,6 +96,7 @@ async def create_artifact(
         "type": artifact_type,
         "title": title,
         "content": content,
+        "version": 1,
         "created_at": now,
         "updated_at": now,
     }
@@ -97,7 +107,7 @@ async def list_artifacts(session_id: str) -> list[dict[str, Any]]:
         cursor = await db.execute(
             """
             SELECT id, session_id, source_message_id, type, title,
-                   content, created_at, updated_at
+                   content, version, created_at, updated_at
             FROM artifacts
             WHERE session_id = ?
             ORDER BY created_at ASC
@@ -114,7 +124,7 @@ async def list_all_artifacts() -> list[dict[str, Any]]:
         cursor = await db.execute(
             """
             SELECT a.id, a.session_id, a.source_message_id, a.type, a.title,
-                   a.content, a.created_at, a.updated_at,
+                   a.content, a.version, a.created_at, a.updated_at,
                    COALESCE(s.title, 'Deleted Session') AS session_title
             FROM artifacts a
             LEFT JOIN sessions s ON a.session_id = s.id
@@ -130,7 +140,7 @@ async def get_artifact(artifact_id: str) -> dict[str, Any] | None:
         cursor = await db.execute(
             """
             SELECT id, session_id, source_message_id, type, title,
-                   content, created_at, updated_at
+                   content, version, created_at, updated_at
             FROM artifacts
             WHERE id = ?
             """,
@@ -144,28 +154,29 @@ async def update_artifact(
     artifact_id: str,
     title: str | None = None,
     content: str | None = None,
+    source_message_id: str | None = None,
 ) -> dict[str, Any] | None:
-    updates: list[str] = []
-    params: list[Any] = []
+    """Update artifact content/title and record a new revision."""
+    current = await get_artifact(artifact_id)
+    if not current:
+        return None
 
-    if title is not None:
-        updates.append("title = ?")
-        params.append(title)
-    if content is not None:
-        updates.append("content = ?")
-        params.append(content)
-
-    if not updates:
-        return await get_artifact(artifact_id)
-
+    new_version = current.get("version", 1) + 1
+    new_title = title if title is not None else current["title"]
+    new_content = content if content is not None else current["content"]
     now = _now()
-    updates.append("updated_at = ?")
-    params.extend([now, artifact_id])
+    revision_id = str(uuid.uuid4())
 
     async with get_db() as db:
         await db.execute(
-            f"UPDATE artifacts SET {', '.join(updates)} WHERE id = ?",  # noqa: S608
-            params,
+            "UPDATE artifacts SET title = ?, content = ?, version = ?, updated_at = ? WHERE id = ?",
+            (new_title, new_content, new_version, now, artifact_id),
+        )
+        await db.execute(
+            """INSERT INTO artifact_revisions
+                 (id, artifact_id, version, title, content, source_message_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (revision_id, artifact_id, new_version, new_title, new_content, source_message_id, now),
         )
         await db.commit()
 
@@ -197,3 +208,19 @@ async def delete_artifact(artifact_id: str) -> bool:
         )
         await db.commit()
     return (cursor.rowcount or 0) > 0
+
+
+async def list_artifact_revisions(artifact_id: str) -> list[dict[str, Any]]:
+    """Return all revisions for an artifact ordered oldest-first."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT id, artifact_id, version, title, content, source_message_id, created_at
+            FROM artifact_revisions
+            WHERE artifact_id = ?
+            ORDER BY version ASC
+            """,
+            (artifact_id,),
+        )
+        rows = await cursor.fetchall()
+    return [dict(row) for row in rows]

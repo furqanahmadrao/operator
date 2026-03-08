@@ -7,9 +7,13 @@ export type ChatMessage = {
   artifactId?: string;
   /** Persisted tool events (e.g. web search) attached to this message */
   toolEvents?: ToolEvent[];
+  /** Reasoning/thinking content emitted by the model (ephemeral, not persisted to DB) */
+  thinkingContent?: string;
+  /** How many seconds the model spent in the <think> phase before first response token */
+  thinkingSeconds?: number;
 };
 
-// Artifact as returned inside the artifact_created SSE event
+// Artifact as returned inside the artifact_created / artifact_updated SSE events
 export type ArtifactPayload = {
   id: string;
   session_id: string;
@@ -17,6 +21,7 @@ export type ArtifactPayload = {
   type: string;
   title: string;
   content: string;
+  version: number;
   created_at: string;
   updated_at: string;
 };
@@ -88,17 +93,39 @@ export type DateCheckEvent = {
  */
 export type ToolEvent = WebSearchEvent | DateCheckEvent;
 
+// ── Deep research types ───────────────────────────────────────────────────────
+
+export type ClarifyingQuestion = {
+  id: string;
+  text: string;
+  /** Undefined falls back to single_select for backwards-compat */
+  type?: "single_select" | "multi_select" | "text";
+  choices: string[];
+};
+
+export type TodoItem = {
+  id: string;
+  text: string;
+  status: "pending" | "active" | "done";
+};
+
 type StreamEvent =
   | { type: "token"; content: string }
   | { type: "error"; message: string };
 
 type SessionStreamEvent =
   | { type: "token"; content: string }
+  | { type: "thinking"; content: string }
   | { type: "error"; message: string }
   | { type: "message_ids"; user_message_id: string; assistant_message_id: string }
   | { type: "artifact_created"; artifact: ArtifactPayload }
+  | { type: "artifact_updated"; artifact: ArtifactPayload }
   | ({ type: "tool_activity" } & ToolActivityPayload)
-  | ({ type: "search_results" } & SearchResultsPayload);
+  | ({ type: "search_results" } & SearchResultsPayload)
+  | { type: "clarifying_questions"; questions: ClarifyingQuestion[] }
+  | { type: "deep_research_plan"; sub_questions: string[]; iteration: number }
+  | { type: "deep_research_progress"; step: string }
+  | { type: "todo_update"; items: TodoItem[] };
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
@@ -181,15 +208,30 @@ export async function streamSessionChat(
   content: string,
   onToken: (token: string) => void,
   onArtifact: (artifact: ArtifactPayload) => void,
+  onArtifactUpdated: ((artifact: ArtifactPayload) => void) | undefined,
   onToolActivity: ((payload: ToolActivityPayload) => void) | undefined,
   onSearchResults: ((payload: SearchResultsPayload) => void) | undefined,
+  onThinking: ((content: string) => void) | undefined,
   signal?: AbortSignal,
   webSearchEnabled = true,
+  thinkEnabled = false,
+  deepResearchEnabled = false,
+  clarifications?: Record<string, string>,
+  onClarifyingQuestions?: (questions: ClarifyingQuestion[]) => void,
+  onDeepResearchPlan?: (subQuestions: string[], iteration: number) => void,
+  onDeepResearchProgress?: (step: string) => void,
+  onTodoUpdate?: (items: TodoItem[]) => void,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content, web_search_enabled: webSearchEnabled }),
+    body: JSON.stringify({
+      content,
+      web_search_enabled: webSearchEnabled,
+      think_enabled: thinkEnabled,
+      deep_research_enabled: deepResearchEnabled,
+      clarifications: clarifications ?? null,
+    }),
     signal,
   });
 
@@ -234,10 +276,14 @@ export async function streamSessionChat(
 
       if (parsed.type === "token") {
         onToken(parsed.content);
+      } else if (parsed.type === "thinking") {
+        onThinking?.(parsed.content);
       } else if (parsed.type === "error") {
         throw new Error(parsed.message);
       } else if (parsed.type === "artifact_created") {
         onArtifact(parsed.artifact);
+      } else if (parsed.type === "artifact_updated") {
+        onArtifactUpdated?.(parsed.artifact);
       } else if (parsed.type === "tool_activity") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const raw = parsed as any;
@@ -248,7 +294,11 @@ export async function streamSessionChat(
             date: raw.date as string,
             time: raw.time as string,
           });
-        } else {
+        } else if (raw.tool === "web_search") {
+          // Only forward web_search activities — other internal tools
+          // (create_artifact, list_session_artifacts, get_current_datetime)
+          // have no dedicated frontend spinner and were previously incorrectly
+          // mapped here, causing a permanent "Searching the web…" state.
           onToolActivity?.({
             tool: "web_search",
             status: raw.status as "running" | "error",
@@ -256,6 +306,7 @@ export async function streamSessionChat(
             message: raw.message as string | undefined,
           });
         }
+        // All other tool_activity types are intentionally ignored.
       } else if (parsed.type === "search_results") {
         onSearchResults?.({
           tool: parsed.tool,
@@ -264,6 +315,14 @@ export async function streamSessionChat(
           result_count: parsed.result_count,
           search_id: parsed.search_id,
         });
+      } else if (parsed.type === "clarifying_questions") {
+        onClarifyingQuestions?.(parsed.questions);
+      } else if (parsed.type === "deep_research_plan") {
+        onDeepResearchPlan?.(parsed.sub_questions, parsed.iteration);
+      } else if (parsed.type === "deep_research_progress") {
+        onDeepResearchProgress?.(parsed.step);
+      } else if (parsed.type === "todo_update") {
+        onTodoUpdate?.(parsed.items);
       }
       // message_ids: stored server-side, not needed client-side yet
     }

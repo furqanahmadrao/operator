@@ -98,5 +98,27 @@ class NVIDIAClient:
         content = data["choices"][0]["message"]["content"]
         return content if isinstance(content, str) else ""
 
+    async def list_models(self) -> list[dict]:
+        """Return a list of available models from the NVIDIA catalog.
+
+        This is a simple wrapper around GET /models and can be used by
+tools or setup scripts to discover IDs and metadata (such as whether a
+model advertises reasoning/thinking support).
+        """
+        if not self.api_key:
+            raise RuntimeError("Missing NVIDIA_API_KEY. Add it to backend/.env.")
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{self.base_url}/models", headers=headers)
+            response.raise_for_status()
+            data = response.json()
+        # Expecting a dict with a "data" field or a list; return raw if uncertain
+        if isinstance(data, dict) and "data" in data:
+            return data["data"]
+        elif isinstance(data, list):
+            return data
+        else:
+            return []
+
 
 nvidia_client = NVIDIAClient()

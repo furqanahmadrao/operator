@@ -68,7 +68,7 @@ export function ArtifactPreview({ artifact }: ArtifactPreviewProps) {
           </h3>
           <p className="mt-0.5 flex items-center gap-2 text-[11px] text-text-3">
             <span className="uppercase tracking-wider">{artifact.type}</span>
-            <span className="h-1 w-1 shrink-0 rounded-full bg-text-3 opacity-50" />
+            <span className="h-1 w-1 shrink-0 bg-text-3 opacity-50" />
             <span>{formatDate(artifact.created_at)}</span>
           </p>
         </div>

@@ -165,7 +165,7 @@ export function WebSearchBlock({
       subtitle={query || undefined}
       defaultExpanded={false}
     >
-      {hasResults ? (
+              {hasResults ? (
         <div className="tb-sources">
           {results.map((result, idx) => (
             <a
@@ -199,6 +199,7 @@ export function WebSearchBlock({
           ))}
         </div>
       ) : null}
+
     </ToolBlock>
   );
 }

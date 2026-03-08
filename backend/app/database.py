@@ -41,9 +41,23 @@ CREATE TABLE IF NOT EXISTS artifacts (
     type              TEXT NOT NULL DEFAULT 'markdown',
     title             TEXT NOT NULL,
     content           TEXT NOT NULL,
+    version           INTEGER NOT NULL DEFAULT 1,
     created_at        TEXT NOT NULL,
     updated_at        TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS artifact_revisions (
+    id                TEXT PRIMARY KEY,
+    artifact_id       TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+    version           INTEGER NOT NULL,
+    title             TEXT NOT NULL,
+    content           TEXT NOT NULL,
+    source_message_id TEXT,
+    created_at        TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_revisions_artifact
+    ON artifact_revisions(artifact_id, version);
 
 CREATE TABLE IF NOT EXISTS messages (
     id              TEXT PRIMARY KEY,
@@ -71,6 +85,17 @@ _MIGRATIONS = [
     "ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE sessions ADD COLUMN project_id TEXT",
     "ALTER TABLE projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE artifacts ADD COLUMN version INTEGER NOT NULL DEFAULT 1",
+    """CREATE TABLE IF NOT EXISTS artifact_revisions (
+    id                TEXT PRIMARY KEY,
+    artifact_id       TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+    version           INTEGER NOT NULL,
+    title             TEXT NOT NULL,
+    content           TEXT NOT NULL,
+    source_message_id TEXT,
+    created_at        TEXT NOT NULL
+)""",
+    "CREATE INDEX IF NOT EXISTS idx_revisions_artifact ON artifact_revisions(artifact_id, version)",
 ]
 
 

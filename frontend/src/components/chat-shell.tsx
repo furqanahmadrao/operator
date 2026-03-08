@@ -12,19 +12,26 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowUp, Check, ChevronLeft, ChevronRight, Copy, Files, FolderOpen, Image as ImageIcon, Lightbulb, Menu, Microscope, Paperclip, Pencil, Plus, Search as SearchIcon, SlidersHorizontal, Square, SquarePen, X } from "lucide-react";
+import { ArrowUp, Check, ChevronLeft, ChevronRight, Copy, Edit3, Files, FolderOpen, Image as ImageIcon, Mic, Paperclip, Pencil, Square, X } from "lucide-react";
+import { LeftRail } from "@/components/shell/left-rail";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { ChatErrorBanner } from "@/components/chat/chat-error-banner";
+import { ChatLoadingSkeleton } from "@/components/chat/chat-loading-skeleton";
 import { CodeBlock } from "@/components/chat/code-block";
 import { WebSearchBlock } from "@/components/chat/tool-activity";
+import { ThinkingBlock } from "@/components/chat/thinking-block";
+import ClarifyingQuestionsBar from "@/components/chat/clarifying-questions-bar";
+import { TodoWidget } from "@/components/chat/todo-widget";
 import { SessionSidebar } from "@/components/shell/session-sidebar";
 import { FilesPanel } from "@/components/shell/files-panel";
 import { ArtifactPanel } from "@/components/artifact/artifact-panel";
 import { ArtifactCard, StreamingArtifactCard } from "@/components/artifact/artifact-card";
 import type {
   ChatMessage,
+  ClarifyingQuestion,
+  TodoItem,
   ToolActivityPayload,
   SearchResultsPayload,
   ToolEvent,
@@ -44,6 +51,7 @@ import type { Artifact } from "@/lib/artifacts-api";
 import { deleteArtifact, listArtifacts } from "@/lib/artifacts-api";
 import type { Project } from "@/lib/projects-api";
 import { listProjects } from "@/lib/projects-api";
+import { useVoiceInput } from "@/lib/use-voice-input";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -74,7 +82,12 @@ const ARTIFACT_SENTINEL = "\x00";
  * preserving any text that comes before or after it.
  */
 function injectArtifactSentinel(content: string): string {
-  return content.replace(ARTIFACT_BLOCK_RE, ARTIFACT_SENTINEL);
+  // For XML-path: replace the <artifact> block if present
+  const replaced = content.replace(ARTIFACT_BLOCK_RE, ARTIFACT_SENTINEL);
+  // If a replacement happened, use it; otherwise append sentinel at current end
+  // (tool-path: no XML in stream, so we mark the current position)
+  if (replaced !== content) return replaced;
+  return content + ARTIFACT_SENTINEL;
 }
 
 /**
@@ -191,7 +204,6 @@ export function ChatShell() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const [thinkingSeconds, setThinkingSeconds] = useState(0);
-  const [thoughtForSeconds, setThoughtForSeconds] = useState<number | null>(null);
   const [streamPaused, setStreamPaused] = useState(false);
   const thinkingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const thinkingSecondsRef = useRef(0);
@@ -215,10 +227,7 @@ export function ChatShell() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Tools menu ──────────────────────────────────────────────────────────────
-  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
-  const toolsMenuRef = useRef<HTMLDivElement>(null);
-  const toolsMenuBtnRef = useRef<HTMLButtonElement>(null);
+  // ── Tools state ────────────────────────────────────────────────────────────
   const [thinkEnabled, setThinkEnabled] = useState(false);
   const [deepResearchEnabled, setDeepResearchEnabled] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
@@ -226,7 +235,23 @@ export function ChatShell() {
   // useCallback to avoid a stale closure (webSearchEnabled is NOT in the dep array).
   const webSearchEnabledRef = useRef(webSearchEnabled);
   useEffect(() => { webSearchEnabledRef.current = webSearchEnabled; }, [webSearchEnabled]);
+  // Stale-closure-safe refs for think and deep research toggles
+  const thinkEnabledRef = useRef(thinkEnabled);
+  useEffect(() => { thinkEnabledRef.current = thinkEnabled; }, [thinkEnabled]);
+  const deepResearchEnabledRef = useRef(deepResearchEnabled);
+  useEffect(() => { deepResearchEnabledRef.current = deepResearchEnabled; }, [deepResearchEnabled]);
 
+  // Ref version of thoughtForSeconds — allows reliable reads in finally block
+  const thoughtForSecondsRef = useRef<number | null>(null);
+
+  // ── Deep research clarifying questions state ──────────────────────────────
+  const [pendingClarifyingQuestions, setPendingClarifyingQuestions] =
+    useState<ClarifyingQuestion[] | null>(null);
+  const [pendingResearchQuery, setPendingResearchQuery] = useState<string | null>(null);
+
+  // ── Deep research todo-list state ─────────────────────────────────────────
+  const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
+  const [todoCollapsed, setTodoCollapsed] = useState(false);
 
   // ── Web search tool state ─────────────────────────────────────────────────
   const [activeToolActivity, setActiveToolActivity] =
@@ -260,6 +285,34 @@ export function ChatShell() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ── Voice input ───────────────────────────────────────────────────────────
+  // Snapshot of `prompt` at the moment recording starts, so we can append
+  // interim/final text onto any text the user already typed.
+  const preVoicePromptRef = useRef("");
+
+  const voice = useVoiceInput({
+    onTranscript: (text, isFinal) => {
+      const base = preVoicePromptRef.current;
+      const separator = base.length > 0 && !base.endsWith(" ") ? " " : "";
+      if (isFinal) {
+        // Commit final text (trim trailing space from interim, add space for next word)
+        setPrompt(base + separator + text.trim() + " ");
+      } else {
+        // Show interim in-progress text as a live preview
+        setPrompt(base + separator + text);
+      }
+    },
+  });
+
+  const handleVoiceToggle = useCallback(() => {
+    if (voice.state === "listening") {
+      voice.stopListening();
+    } else {
+      preVoicePromptRef.current = prompt;
+      voice.startListening();
+    }
+  }, [voice, prompt]);
+
   const greeting = useMemo(() => getGreeting(), []);
 
   const showEmptyState = useMemo(
@@ -279,6 +332,7 @@ export function ChatShell() {
     const artifactId = searchParams.get("artifact");
     const messageParam = searchParams.get("message");
     const projectParam = searchParams.get("project");
+    const deepResearchParam = searchParams.get("deepResearch");
     if (sessionId) {
       if (artifactId) pendingArtifactIdRef.current = artifactId;
       if (messageParam) {
@@ -286,6 +340,10 @@ export function ChatShell() {
         pendingMessageRef.current = decodeURIComponent(messageParam);
       }
       if (projectParam) setActiveProjectId(projectParam);
+      // If launched from projects page with ?deepResearch=true, pre-enable the mode
+      if (deepResearchParam === "true") {
+        setDeepResearchEnabled(true);
+      }
       setCurrentSessionId(sessionId);
       // Clean the URL without triggering a navigation
       router.replace("/", { scroll: false });
@@ -337,7 +395,15 @@ export function ChatShell() {
             return {
               role: m.role as ChatMessage["role"],
               content:
-                m.role === "assistant" ? stripArtifactBlock(m.content) : m.content,
+                m.role === "assistant"
+                  ? m.artifact_id
+                    // Preserve the artifact's inline position: replace <artifact>…</artifact>
+                    // block with the sentinel character so splitAroundArtifact works correctly.
+                    // For tool-path messages the sentinel (\x00) is already in the stored
+                    // content — the replace below is a no-op in that case.
+                    ? m.content.replace(ARTIFACT_BLOCK_RE, ARTIFACT_SENTINEL)
+                    : stripArtifactBlock(m.content)
+                  : m.content,
               artifactId: m.artifact_id ?? undefined,
               toolEvents,
             };
@@ -407,31 +473,37 @@ export function ChatShell() {
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "0px";
+    el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [prompt]);
 
   useEffect(() => {
     const el = editTextareaRef.current;
     if (!el) return;
-    el.style.height = "0px";
+    el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 300)}px`;
   }, [editValue]);
 
-  // ── Mid-stream pause detection ────────────────────────────────────────────
-  // If we've received at least one token but no new token arrives for 4s,
-  // show a "Still generating…" indicator to keep the user informed.
+  // ── Mid-stream pause / stall detection ───────────────────────────────────
+  // Two-phase detection:
+  //   Phase 1 (pre-first-token): If the backend hasn't sent a single token
+  //     within 15 s of the request starting, flag as paused.  This surfaces
+  //     cold-start delays, LLM API hangs, etc.
+  //   Phase 2 (mid-stream):  Once tokens have started flowing, flag if there
+  //     is a gap of > 4 s (tool call, long reasoning step, etc.).
   useEffect(() => {
     if (!isStreaming) {
       setStreamPaused(false);
       return;
     }
     const intervalId = setInterval(() => {
-      if (
-        hasReceivedFirstTokenRef.current &&
-        Date.now() - lastTokenTimeRef.current > 4000
-      ) {
-        setStreamPaused(true);
+      const elapsed = Date.now() - lastTokenTimeRef.current;
+      if (hasReceivedFirstTokenRef.current) {
+        // Post-first-token: pause after a 4 s gap
+        if (elapsed > 4_000) setStreamPaused(true);
+      } else {
+        // Pre-first-token: warn after 15 s of silence
+        if (elapsed > 15_000) setStreamPaused(true);
       }
     }, 1000);
     return () => clearInterval(intervalId);
@@ -527,7 +599,7 @@ export function ChatShell() {
         clearInterval(thinkingTimerRef.current);
         thinkingTimerRef.current = null;
       }
-      setThoughtForSeconds(thinkingSecondsRef.current);
+      thoughtForSecondsRef.current = thinkingSecondsRef.current;
     }
     setMessages((prev) => {
       if (!prev.length) return prev;
@@ -535,6 +607,18 @@ export function ChatShell() {
       const last = next[next.length - 1];
       if (last.role !== "assistant") return next;
       next[next.length - 1] = { ...last, content: `${last.content}${token}` };
+      return next;
+    });
+  };
+
+  const appendThinkingToken = (token: string) => {
+    setMessages((prev) => {
+      if (!prev.length) return prev;
+      const next = [...prev];
+      const last = next[next.length - 1];
+      if (last.role !== "assistant") return next;
+      const existing = last.thinkingContent ?? "";
+      next[next.length - 1] = { ...last, thinkingContent: existing + token };
       return next;
     });
   };
@@ -622,7 +706,7 @@ export function ChatShell() {
       setStreamPaused(false);
       thinkingSecondsRef.current = 0;
       setThinkingSeconds(0);
-      setThoughtForSeconds(null);
+      thoughtForSecondsRef.current = null;
       thinkingTimerRef.current = setInterval(() => {
         thinkingSecondsRef.current += 1;
         setThinkingSeconds(thinkingSecondsRef.current);
@@ -664,6 +748,8 @@ export function ChatShell() {
             }
             void refreshSessions();
           },
+          // onArtifactUpdated — not handled in this view (artifacts are loaded fresh)
+          undefined,
           // onToolActivity — update live status row
           (activity) => {
             if (activity.tool === "date_check") {
@@ -717,8 +803,35 @@ export function ChatShell() {
               },
             ];
           },
+          // onThinking — accumulate reasoning tokens into message state
+          appendThinkingToken,
           controller.signal,
           webSearchEnabledRef.current,
+          thinkEnabledRef.current,
+          deepResearchEnabledRef.current,
+          undefined,    // clarifications (null = Call 1 — generate questions)
+          // onClarifyingQuestions — swap composer for question bar
+          (questions) => {
+            setPendingClarifyingQuestions(questions);
+            setPendingResearchQuery(trimmed);
+          },
+          // onDeepResearchPlan — seed the todo widget from the research plan
+          (sub_questions, iteration) => {
+            if (iteration === 0) {
+              setTodoItems(
+                sub_questions.map((q, i) => ({
+                  id: `plan-${i}`,
+                  text: q,
+                  status: "pending" as const,
+                })),
+              );
+              setTodoCollapsed(false);
+            }
+          },
+          // onDeepResearchProgress — not rendered separately (progress visible via tokens)
+          undefined,
+          // onTodoUpdate — live todo state updates from run_searches node
+          (items) => { setTodoItems(items); },
         );
 
         void refreshSessions();
@@ -741,16 +854,144 @@ export function ChatShell() {
           thinkingTimerRef.current = null;
         }
         if (streamGenRef.current === myGen) {
-          // Bake any pending tool events into the last assistant message
-          if (pendingToolEventsRef.current.length > 0) {
-            const baked = pendingToolEventsRef.current;
+          // Bake pending tool events and thinkingSeconds into the last assistant message
+          const bakedToolEvents = pendingToolEventsRef.current;
+          const bakedThinkingSeconds =
+            thinkEnabledRef.current ? thoughtForSecondsRef.current : null;
+
+          if (bakedToolEvents.length > 0 || bakedThinkingSeconds !== null) {
             setMessages((prev) => {
               const last = prev[prev.length - 1];
               if (!last || last.role !== "assistant") return prev;
-              return [...prev.slice(0, -1), { ...last, toolEvents: baked }];
+              const updates: Partial<typeof last> = {};
+              if (bakedToolEvents.length > 0) updates.toolEvents = bakedToolEvents;
+              if (bakedThinkingSeconds !== null) updates.thinkingSeconds = bakedThinkingSeconds;
+              return [...prev.slice(0, -1), { ...last, ...updates }];
             });
             pendingToolEventsRef.current = [];
           }
+          setActiveToolActivity(null);
+          setActiveSearchResults(null);
+          setStreamingArtifact(null);
+          abortControllerRef.current = null;
+          streamingRef.current = false;
+          setIsStreaming(false);
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages, currentSessionId, ensureSession, refreshSessions],
+  );
+
+  /**
+   * Called when the user submits answers from ClarifyingQuestionsBar.
+   * Sends Call 2: deep_research_enabled=true + clarifications dict.
+   */
+  const sendMessageWithClarifications = useCallback(
+    async (query: string, clarifications: Record<string, string>) => {
+      const trimmed = query.trim();
+      if (!trimmed || streamingRef.current) return;
+
+      // Dismiss the questions bar
+      setPendingClarifyingQuestions(null);
+      setPendingResearchQuery(null);
+
+      const myGen = ++streamGenRef.current;
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      streamingRef.current = true;
+      setErrorMessage("");
+      setIsStreaming(true);
+      userClosedPanelRef.current = false;
+
+      // Add the research label message + placeholder assistant message
+      setMessages((prev) => [
+        ...prev,
+        { role: "user" as const, content: `🔬 Starting deep research with your answers…` },
+      ]);
+      appendAssistantPlaceholder();
+
+      hasReceivedFirstTokenRef.current = false;
+      lastTokenTimeRef.current = Date.now();
+      setStreamPaused(false);
+      thinkingSecondsRef.current = 0;
+      setThinkingSeconds(0);
+      thoughtForSecondsRef.current = null;
+
+      try {
+        const sessionId = await ensureSession();
+        pendingToolEventsRef.current = [];
+        setActiveToolActivity(null);
+        setActiveSearchResults(null);
+
+        await streamSessionChat(
+          sessionId,
+          trimmed,
+          appendAssistantToken,
+          (artifact) => {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.role !== "assistant") return prev;
+              return [
+                ...prev.slice(0, -1),
+                { ...last, content: injectArtifactSentinel(last.content), artifactId: artifact.id },
+              ];
+            });
+            setArtifacts((prev) =>
+              prev.some((a) => a.id === artifact.id) ? prev : [...prev, artifact],
+            );
+            setSelectedArtifactId(artifact.id);
+            if (!userClosedPanelRef.current) {
+              setIsArtifactPanelOpen(true);
+              setIsFilesPanelOpen(false);
+              setArtifactPanelWidth(
+                typeof window !== "undefined" ? Math.floor(window.innerWidth / 2) : 560,
+              );
+            }
+            void refreshSessions();
+          },
+          undefined,           // onArtifactUpdated
+          undefined,           // onToolActivity
+          undefined,           // onSearchResults
+          undefined,           // onThinking
+          controller.signal,
+          false,               // webSearchEnabled (Google CSE handles search internally)
+          false,               // thinkEnabled
+          true,                // deepResearchEnabled = true (Call 2)
+          clarifications,      // the user's answers
+          undefined,           // onClarifyingQuestions (not expected on Call 2)
+          // onDeepResearchPlan — seed todo widget for Call 2 (re-plan on 2nd iteration)
+          (sub_questions, iteration) => {
+            if (iteration === 0) {
+              setTodoItems(
+                sub_questions.map((q, i) => ({
+                  id: `plan-${i}`,
+                  text: q,
+                  status: "pending" as const,
+                })),
+              );
+              setTodoCollapsed(false);
+            }
+          },
+          undefined,           // onDeepResearchProgress
+          // onTodoUpdate — live search-step progress updates
+          (items) => { setTodoItems(items); },
+        );
+
+        void refreshSessions();
+      } catch (error) {
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant" && !last.content) return prev.slice(0, -1);
+          return prev;
+        });
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Deep research failed.",
+          );
+        }
+      } finally {
+        if (streamGenRef.current === myGen) {
           setActiveToolActivity(null);
           setActiveSearchResults(null);
           setStreamingArtifact(null);
@@ -803,7 +1044,6 @@ export function ChatShell() {
     setErrorMessage("");
     setPrompt("");
     setEditingIndex(null);
-    setThoughtForSeconds(null);
     setThinkingSeconds(0);
     setActiveToolActivity(null);
     setActiveSearchResults(null);
@@ -815,7 +1055,9 @@ export function ChatShell() {
     setStreamingArtifact(null);
     setActiveProjectId(null);
     setIsPlusMenuOpen(false);
-    setIsToolsMenuOpen(false);
+    setPendingClarifyingQuestions(null);
+    setPendingResearchQuery(null);
+    setTodoItems([]);
   }, []);
 
   const handleSelectSession = useCallback(
@@ -829,8 +1071,10 @@ export function ChatShell() {
       setIsArtifactPanelOpen(false);
       setErrorMessage("");
       setEditingIndex(null);
-      setThoughtForSeconds(null);
       setThinkingSeconds(0);
+      setPendingClarifyingQuestions(null);
+      setPendingResearchQuery(null);
+      setTodoItems([]);
       setCurrentSessionId(id);
     },
     [currentSessionId],
@@ -878,6 +1122,21 @@ export function ChatShell() {
     setIsArtifactPanelOpen(true);
     setIsFilesPanelOpen(false); // files panel hides when artifact opens
   }, []);
+
+  // Derived: look up the artifact object for the panel
+  const selectedArtifact = artifacts.find((a) => a.id === selectedArtifactId) ?? null;
+
+  // ── Pane header title ─────────────────────────────────────────────────────
+  const currentSession = sessions.find((s) => s.id === currentSessionId) ?? null;
+  const sessionProject = currentSession?.project_id
+    ? projects.find((p) => p.id === currentSession.project_id) ?? null
+    : null;
+  const paneTitle =
+    !currentSession || messages.length === 0
+      ? "Operator"
+      : sessionProject
+        ? `${sessionProject.name} / ${currentSession.title}`
+        : currentSession.title;
 
   // ── Copy to clipboard ─────────────────────────────────────────────────────
   const copyToClipboard = async (text: string, index: number) => {
@@ -938,43 +1197,6 @@ export function ChatShell() {
   const renderComposer = (dropUp = false) => {
     const activeProject = activeProjectId ? projects.find((p) => p.id === activeProjectId) : null;
 
-    // Collect enabled tools for pill display
-    const enabledTools: { key: string; label: string; icon: React.ReactNode; toggle: () => void }[] = [
-      thinkEnabled && { key: "think", label: "Think", icon: <Lightbulb size={10} />, toggle: () => setThinkEnabled(false) },
-      webSearchEnabled && { key: "search", label: "Search", icon: <SearchIcon size={10} />, toggle: () => setWebSearchEnabled(false) },
-      deepResearchEnabled && { key: "deep-research", label: "Deep Research", icon: <Microscope size={10} />, toggle: () => setDeepResearchEnabled(false) },
-    ].filter(Boolean) as { key: string; label: string; icon: React.ReactNode; toggle: () => void }[];
-
-    // if project active, treat it like a tool pill too
-    if (activeProject) {
-      enabledTools.push({
-        key: "project",
-        label: activeProject.name,
-        icon: <FolderOpen size={10} className="shrink-0 text-text-3" />,
-        toggle: () => setActiveProjectId(null),
-      });
-    }
-
-    // Attachment pills
-    const attachmentPills = attachments.map((att) => (
-      <span key={att.id} className="tool-active-pill">
-        {att.file.type.startsWith("image/") ? (
-          <img src={att.url} className="h-3 w-3 rounded" alt="" />
-        ) : (
-          <Paperclip size={10} />
-        )}
-        <span className="truncate max-w-[60px]">{att.file.name}</span>
-        <button
-          type="button"
-          onClick={() => removeAttachment(att.id)}
-          className="ml-0.5 flex h-3 w-3 items-center justify-center rounded-full opacity-50 hover:opacity-100 focus:outline-none"
-          aria-label="Remove attachment"
-        >
-          <X size={8} strokeWidth={2.5} />
-        </button>
-      </span>
-    ));
-
     // Shared Projects list renderer (used in + menu submenu)
     const renderProjectsList = (onSelect: () => void) =>
       projects.length === 0 ? (
@@ -1010,222 +1232,248 @@ export function ChatShell() {
 
     return (
       <form onSubmit={onSubmit} className="composer-card">
-        <textarea
-          ref={textareaRef}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={onTextareaKeyDown}
-          placeholder="Ask anything…"
-          aria-label="Message input"
-          className="composer-textarea"
-          rows={1}
-        />
+        {/* ── Tool checkboxes row ───────────────────────────────────────────── */}
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          {/* Think */}
+          <label className="group flex cursor-pointer items-center gap-1.5">
+            <div
+              onClick={() => setThinkEnabled((v) => !v)}
+              className={`flex h-3 w-3 items-center justify-center border transition-colors ${
+                thinkEnabled ? "border-accent bg-accent" : "border-text-1 group-hover:bg-black/10"
+              }`}
+            >
+              {thinkEnabled && <Check size={8} className="text-white" strokeWidth={3} />}
+            </div>
+            <span className={`select-none text-[10px] font-bold uppercase tracking-widest ${
+              thinkEnabled ? "text-accent" : "text-text-3 group-hover:text-text-1"
+            }`}>Think</span>
+          </label>
+          {/* Web */}
+          <label className="group flex cursor-pointer items-center gap-1.5">
+            <div
+              onClick={() => setWebSearchEnabled((v) => !v)}
+              className={`flex h-3 w-3 items-center justify-center border transition-colors ${
+                webSearchEnabled ? "border-accent bg-accent" : "border-text-1 group-hover:bg-black/10"
+              }`}
+            >
+              {webSearchEnabled && <Check size={8} className="text-white" strokeWidth={3} />}
+            </div>
+            <span className={`select-none text-[10px] font-bold uppercase tracking-widest ${
+              webSearchEnabled ? "text-accent" : "text-text-3 group-hover:text-text-1"
+            }`}>Web</span>
+          </label>
+          {/* Research */}
+          <label className="group flex cursor-pointer items-center gap-1.5">
+            <div
+              onClick={() => setDeepResearchEnabled((v) => !v)}
+              className={`flex h-3 w-3 items-center justify-center border transition-colors ${
+                deepResearchEnabled ? "border-accent bg-accent" : "border-text-1 group-hover:bg-black/10"
+              }`}
+            >
+              {deepResearchEnabled && <Check size={8} className="text-white" strokeWidth={3} />}
+            </div>
+            <span className={`select-none text-[10px] font-bold uppercase tracking-widest ${
+              deepResearchEnabled ? "text-accent" : "text-text-3 group-hover:text-text-1"
+            }`}>Research</span>
+          </label>
 
-        {/* ── Bottom toolbar ───────────────────────────────────────────────── */}
-        <div className="mt-2 flex items-center justify-between gap-2">
+          {/* Active project indicator — removed from here; shown as pill in action row */}
 
-          {/* Left cluster: action buttons + active tool & attachment pills */}
-          <div className="flex min-w-0 items-center gap-1">
-
-            {/* ── + (Attach) button ─────────────────────────────────────── */}
-            <div className="relative shrink-0">
-              <button
-                ref={plusMenuBtnRef}
-                type="button"
-                onClick={() => {
-                  setIsPlusMenuOpen((v) => !v);
-                  setPlusMenuPage("main");
-                  setIsToolsMenuOpen(false);
-                }}
-                className={`composer-icon-btn ${isPlusMenuOpen ? "bg-surface-3 text-text-2" : ""}`}
-                aria-label="Add attachments"
-                aria-haspopup="menu"
-                aria-expanded={isPlusMenuOpen}
-              >
-                <Plus size={14} strokeWidth={2} />
-              </button>
-              {isPlusMenuOpen && (
-                <div
-                  ref={plusMenuRef}
-                  role="menu"
-                  className={`composer-dropdown${dropUp ? " composer-dropdown-up" : ""}`}
-                >
-                  {plusMenuPage === "main" ? (
-                    <>
-                      {/* Add images */}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setIsPlusMenuOpen(false);
-                          imageInputRef.current?.click();
-                        }}
-                        className="composer-dropdown-item w-full text-left"
-                      >
-                        <ImageIcon size={13} className="shrink-0 text-text-3" />
-                        <span>Add images</span>
-                      </button>
-                      {/* Add files */}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setIsPlusMenuOpen(false);
-                          fileInputRef.current?.click();
-                        }}
-                        className="composer-dropdown-item w-full text-left"
-                      >
-                        <Paperclip size={13} className="shrink-0 text-text-3" />
-                        <span>Add files</span>
-                      </button>
-                      <div className="mx-2 my-1 border-t border-border" />
-                      {/* Use a Project */}
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => setPlusMenuPage("projects")}
-                        className="composer-dropdown-item w-full text-left"
-                      >
-                        <FolderOpen size={13} className="shrink-0 text-text-3" />
-                        <span className="flex-1">Use a Project</span>
-                        {activeProjectId && <span className="h-1.5 w-1.5 rounded-full bg-text-2 shrink-0" />}
-                        <ChevronRight size={11} className="shrink-0 text-text-3" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setPlusMenuPage("main")}
-                        className="flex items-center gap-1.5 px-3 py-2 text-[12px] text-text-3 transition-colors hover:text-text-2 w-full"
-                      >
-                        <ChevronLeft size={12} />
-                        Back
-                      </button>
-                      <div className="mx-2 my-0.5 border-t border-border" />
-                      <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-text-3">
-                        Projects
-                      </p>
-                      {renderProjectsList(() => setIsPlusMenuOpen(false))}
-                    </>
-                  )}
-                </div>
+          {/* Attachment pills */}
+          {attachments.map((att) => (
+            <span key={att.id} className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-text-2">
+              {att.file.type.startsWith("image/") ? (
+                <img src={att.url} className="h-3 w-3" alt="" />
+              ) : (
+                <Paperclip size={8} />
               )}
+              <span className="truncate max-w-[60px]">{att.file.name}</span>
+              <button type="button" onClick={() => removeAttachment(att.id)} className="opacity-60 hover:opacity-100 focus:outline-none">
+                <X size={8} strokeWidth={2.5} />
+              </button>
+            </span>
+          ))}
+
+        </div>
+
+        {/* ── Research Plan — integrated panel above the input box ─────── */}
+        {todoItems.length > 0 && (
+          <div className="composer-todo-wrap">
+            <TodoWidget
+              items={todoItems}
+              collapsed={todoCollapsed}
+              onToggle={() => setTodoCollapsed((v) => !v)}
+            />
+          </div>
+        )}
+
+        {/* ── Inner white box: textarea + action row ─────────────────────── */}
+        <div className="composer-input-box">
+          <textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={onTextareaKeyDown}
+            placeholder="Message Operator…"
+            aria-label="Message input"
+            className="composer-textarea"
+            rows={1}
+          />
+          {/* Action row — Attach + Mic on left | Send/Stop on right */}
+          <div className="flex items-center justify-between px-2 pb-2 pt-1">
+            {/* Left: Attach + Mic */}
+            <div className="flex items-center gap-1">
+              {/* Attach / project trigger */}
+              {/* NOTE: no `relative` wrapper here — the dropdown is positioned
+                  relative to `.composer-input-box` (see CSS) so it spans its
+                  full width instead of just this tiny button wrapper. */}
+              <div>
+                <button
+                  ref={plusMenuBtnRef}
+                  type="button"
+                  onClick={() => {
+                    setIsPlusMenuOpen((v) => !v);
+                    setPlusMenuPage("main");
+                  }}
+                  className={`composer-action-btn${isPlusMenuOpen ? " border-text-3 text-text-2" : " text-text-3 hover:text-text-2"}`}
+                  aria-label="Attach files or use project"
+                  aria-haspopup="menu"
+                  aria-expanded={isPlusMenuOpen}
+                >
+                  <Paperclip size={13} />
+                </button>
+                {isPlusMenuOpen && (
+                  <div
+                    ref={plusMenuRef}
+                    role="menu"
+                    className={`composer-dropdown-full${dropUp ? " composer-dropdown-up" : ""}`}
+                  >
+                    {plusMenuPage === "main" ? (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setIsPlusMenuOpen(false);
+                            imageInputRef.current?.click();
+                          }}
+                          className="composer-dropdown-item w-full text-left"
+                        >
+                          <ImageIcon size={13} className="shrink-0 text-text-3" />
+                          <span>Add images</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setIsPlusMenuOpen(false);
+                            fileInputRef.current?.click();
+                          }}
+                          className="composer-dropdown-item w-full text-left"
+                        >
+                          <Paperclip size={13} className="shrink-0 text-text-3" />
+                          <span>Add files</span>
+                        </button>
+                        <div className="mx-2 my-1 border-t border-border" />
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => setPlusMenuPage("projects")}
+                          className="composer-dropdown-item w-full text-left"
+                        >
+                          <FolderOpen size={13} className="shrink-0 text-text-3" />
+                          <span className="flex-1">Use a Project</span>
+                          {activeProjectId && <span className="h-1.5 w-1.5 bg-text-2 shrink-0" />}
+                          <ChevronRight size={11} className="shrink-0 text-text-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setPlusMenuPage("main")}
+                          className="flex items-center gap-1.5 px-3 py-2 text-[12px] text-text-3 transition-colors hover:text-text-2 w-full"
+                        >
+                          <ChevronLeft size={12} />
+                          Back
+                        </button>
+                        <div className="mx-2 my-0.5 border-t border-border" />
+                        <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-text-3">
+                          Projects
+                        </p>
+                        {renderProjectsList(() => setIsPlusMenuOpen(false))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Active project pill — blue chip next to attach */}
+              {activeProject && (
+                <span className="group inline-flex items-center gap-1 bg-accent px-2 py-0.5 text-[11px] font-semibold text-white">
+                  <FolderOpen size={10} className="shrink-0" />
+                  <span className="max-w-[90px] truncate">{activeProject.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveProjectId(null)}
+                    className="ml-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none"
+                    aria-label="Remove project"
+                  >
+                    <X size={9} strokeWidth={2.5} />
+                  </button>
+                </span>
+              )}
+
+              {/* Mic / Voice button — removed from here, now on right */}
             </div>
 
-            {/* ── Tools (sliders) button ────────────────────────────────── */}
-            <div className="relative shrink-0">
-              <button
-                ref={toolsMenuBtnRef}
-                type="button"
-                onClick={() => {
-                  setIsToolsMenuOpen((v) => !v);
-                  setIsPlusMenuOpen(false);
-                }}
-                className={`composer-icon-btn ${isToolsMenuOpen ? "bg-surface-3 text-text-2" : ""}`}
-                aria-label="Tools"
-                aria-haspopup="menu"
-                aria-expanded={isToolsMenuOpen}
-              >
-                <SlidersHorizontal size={14} />
-              </button>
-              {isToolsMenuOpen && (
-                <div
-                  ref={toolsMenuRef}
-                  role="menu"
-                  className={`composer-dropdown${dropUp ? " composer-dropdown-up" : ""}`}
-                >
-                  <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-text-3">
-                    Tools
-                  </p>
-                  {/* Think */}
-                  <div className="composer-tool-row">
-                    <Lightbulb size={13} className="shrink-0 text-text-3" />
-                    <span className="flex-1 text-[12.5px] text-text-2">Think</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={thinkEnabled}
-                      onClick={() => setThinkEnabled((v) => !v)}
-                      className={`composer-toggle ${thinkEnabled ? "composer-toggle-on" : "composer-toggle-off"}`}
-                    >
-                      <span className="composer-toggle-thumb" />
-                    </button>
-                  </div>
-                  {/* Search */}
-                  <div className="composer-tool-row">
-                    <SearchIcon size={13} className="shrink-0 text-text-3" />
-                    <span className="flex-1 text-[12.5px] text-text-2">Search</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={webSearchEnabled}
-                      onClick={() => setWebSearchEnabled((v) => !v)}
-                      className={`composer-toggle ${webSearchEnabled ? "composer-toggle-on" : "composer-toggle-off"}`}
-                    >
-                      <span className="composer-toggle-thumb" />
-                    </button>
-                  </div>
-                  {/* Deep Research */}
-                  <div className="composer-tool-row">
-                    <Microscope size={13} className="shrink-0 text-text-3" />
-                    <span className="flex-1 text-[12.5px] text-text-2">Deep Research</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={deepResearchEnabled}
-                      onClick={() => setDeepResearchEnabled((v) => !v)}
-                      className={`composer-toggle ${deepResearchEnabled ? "composer-toggle-on" : "composer-toggle-off"}`}
-                    >
-                      <span className="composer-toggle-thumb" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-
-
-            {/* ── Active tool & project pills ─────────────────────────── */}
-            {attachmentPills}
-            {enabledTools.map((tool) => (
-              <span key={tool.key} className="tool-active-pill">
-                <span className="opacity-70">{tool.icon}</span>
-                <span>{tool.label}</span>
+            {/* Right: Mic + Send side by side */}
+            <div className="flex items-center gap-1">
+              {/* Mic / Voice button */}
+              {voice.isSupported && (
                 <button
                   type="button"
-                  onClick={tool.toggle}
-                  className="ml-0.5 flex h-3 w-3 items-center justify-center rounded-full opacity-50 hover:opacity-100 focus:outline-none"
-                  aria-label={`Disable ${tool.label}`}
+                  onClick={handleVoiceToggle}
+                  className={`composer-action-btn transition-colors${
+                    voice.state === "listening"
+                      ? " border-[#2563eb] bg-[#2563eb] text-white"
+                      : " text-text-3 hover:text-text-2"
+                  }`}
+                  aria-label={voice.state === "listening" ? "Stop recording" : "Voice input"}
                 >
-                  <X size={8} strokeWidth={2.5} />
+                  <Mic size={13} />
                 </button>
-              </span>
-            ))}
-          </div>
+              )}
 
-          {/* ── Send / Stop ──────────────────────────────────────────────── */}
-          {isStreaming ? (
-            <button
-              type="button"
-              onClick={stopStreaming}
-              className="composer-stop shrink-0"
-              aria-label="Stop generating"
-            >
-              <Square size={9} fill="currentColor" strokeWidth={0} />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              className="composer-send shrink-0"
-              disabled={!prompt.trim()}
-              aria-label="Send message"
-            >
-              <ArrowUp size={14} strokeWidth={2.5} />
-            </button>
-          )}
+              {/* Send / Stop */}
+              {isStreaming ? (
+                <button
+                  type="button"
+                  onClick={stopStreaming}
+                  className="composer-action-btn border-text-2 text-text-2 hover:border-text-1 hover:text-text-1"
+                  aria-label="Stop generating"
+                >
+                  <Square size={12} fill="currentColor" strokeWidth={0} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!prompt.trim()}
+                  className={`composer-action-btn transition-colors${
+                    prompt.trim()
+                      ? " border-[#2563eb] bg-[#2563eb] text-white hover:bg-[#1d4ed8] hover:border-[#1d4ed8]"
+                      : " text-text-3 hover:text-text-2"
+                  }`}
+                  aria-label="Send message"
+                >
+                  <ArrowUp size={15} strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-        {/* hidden inputs used by plus menu */}
+
+        {/* Hidden file inputs */}
         <input
           ref={imageInputRef}
           type="file"
@@ -1262,103 +1510,21 @@ export function ChatShell() {
     return () => document.removeEventListener("mousedown", handler);
   }, [isPlusMenuOpen]);
 
-  // Close tools menu on outside click
-  useEffect(() => {
-    if (!isToolsMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        !toolsMenuRef.current?.contains(e.target as Node) &&
-        !toolsMenuBtnRef.current?.contains(e.target as Node)
-      ) {
-        setIsToolsMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isToolsMenuOpen]);
-
-
-
-  // Derived selected artifact object
-  const selectedArtifact =
-    artifacts.find((a) => a.id === selectedArtifactId) ?? null;
-
-  // Derive current session title + project for top bar
-  const currentSession = sessions.find(s => s.id === currentSessionId) ?? null;
-  const currentProject = currentSession?.project_id
-    ? (projects.find(p => p.id === currentSession.project_id) ?? null)
-    : null;
-
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-bg font-sans text-text-1">
-      {/* Top bar */}
-      <header className="relative z-30 flex h-12 shrink-0 items-center justify-between border-b border-border/20 bg-bg px-4">
-        <div className="flex min-w-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setIsSidebarOpen((v) => !v)}
-            className="icon-btn h-8 w-8 shrink-0"
-            aria-label="Toggle chat history"
-            aria-expanded={isSidebarOpen}
-          >
-            <Menu size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={startNewChat}
-            className="icon-btn h-8 w-8 shrink-0"
-            aria-label="New chat"
-          >
-            <SquarePen size={14} />
-          </button>
-          {/* Session title / project breadcrumb */}
-          {currentSessionId && (
-            <div className="ml-1 flex min-w-0 items-center gap-1.5 border-l border-border/40 pl-3 text-[12.5px]">
-              {currentProject && (
-                <>
-                  <span className="shrink-0 text-text-3">{currentProject.name}</span>
-                  <span className="shrink-0 text-text-3 opacity-50">/</span>
-                </>
-              )}
-              <span className="truncate text-text-2">
-                {currentSession?.title ?? "Chat"}
-              </span>
-            </div>
-          )}
-        </div>
+    <div className="flex h-screen overflow-hidden bg-bg text-text-1">
 
-        <div className="flex items-center gap-2">
-          {/* Files button — only visible when this session has artifacts AND artifact panel is NOT open */}
-          {artifacts.length > 0 && !isArtifactPanelOpen && (
-            <button
-              type="button"
-              onClick={() => setIsFilesPanelOpen((v) => !v)}
-              className="files-btn files-btn-has-items"
-              aria-label="Toggle files panel"
-              aria-expanded={isFilesPanelOpen}
-            >
-              <Files size={13} />
-              <span>Files</span>
-              <span className="files-btn-badge">{artifacts.length}</span>
-            </button>
-          )}
+      {/* ── Left Rail ───────────────────────────────────────────────────── */}
+      <LeftRail
+        onToggleHistory={() => setIsSidebarOpen((v) => !v)}
+        historyOpen={isSidebarOpen}
+      />
 
-          <div
-            className="flex h-7 w-7 shrink-0 cursor-default select-none items-center justify-center rounded-full border border-border-strong bg-surface-2 text-[11px] font-semibold text-text-2"
-            title={USER_NAME}
-            aria-label={`Signed in as ${USER_NAME}`}
-          >
-            {USER_INITIALS}
-          </div>
-        </div>
-      </header>
-
-      {/* Main canvas — horizontal split when artifact panel is open */}
-      <div className="flex min-w-0 flex-1 overflow-hidden">
-        {/* ── HISTORY SIDEBAR (inline, pushes content) ────────────────── */}
+      {/* ── Session sidebar + chat + artifact ──────────────────────────────── */}
+      <div className="relative flex min-w-0 flex-1 overflow-hidden">
+        {/* Session History Sidebar */}
         <SessionSidebar
           open={isSidebarOpen}
-          sessions={sessions.filter(s => s.project_id === null)}
+          sessions={sessions}
           activeSessionId={currentSessionId}
           onSelect={handleSelectSession}
           onRename={handleRenameSession}
@@ -1367,33 +1533,82 @@ export function ChatShell() {
           onClose={() => setIsSidebarOpen(false)}
         />
 
-        {/* ── LEFT: Chat pane ───────────────────────────────────────────── */}
-        <div
-          className="flex min-w-0 flex-1 flex-col overflow-hidden"
-          style={isArtifactPanelOpen ? { minWidth: 200 } : undefined}
-        >
+        {/* Dim backdrop when sidebar is open — click to dismiss */}
+        {isSidebarOpen && (
+          <div
+            className="absolute inset-x-0 bottom-0 top-12 z-10 bg-black/10"
+            onClick={() => setIsSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* ── Chat pane ────────────────────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+
+          {/* Pane header */}
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-bg px-4">
+            <span
+              className="truncate text-[15px] font-bold tracking-[-0.02em] text-text-1"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {paneTitle}
+            </span>
+            <div className="flex items-center gap-1.5">
+              {artifacts.length > 0 && !isArtifactPanelOpen && (
+                <button
+                  type="button"
+                  onClick={() => setIsFilesPanelOpen((v) => !v)}
+                  className="files-btn files-btn-has-items"
+                >
+                  <Files size={13} />
+                  <span>Files</span>
+                  <span className="files-btn-badge">{artifacts.length}</span>
+                </button>
+              )}
+              {/* New chat button */}
+              <button
+                type="button"
+                onClick={startNewChat}
+                className="flex h-7 w-7 items-center justify-center text-text-3 transition-colors hover:text-text-1 focus-visible:outline-none"
+                aria-label="New chat"
+                title="New chat"
+              >
+                <Edit3 size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Loading skeleton */}
           {isLoadingSession && (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="thinking-indicator">
-                <span className="thinking-dots">
-                  <span />
-                  <span />
-                  <span />
-                </span>
-                <span className="thinking-label">Loading…</span>
-              </div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-4">
+              <ChatLoadingSkeleton />
+              <span className="thinking-label">Loading…</span>
             </div>
           )}
 
           {showEmptyState && (
             <div className="flex flex-1 flex-col items-center justify-center px-4 pb-10">
               <div className="w-full max-w-[680px]">
-                <h1 className="mb-5 text-center text-[1.5rem] font-semibold tracking-[-0.02em] text-text-1">
-                  {greeting}, {USER_NAME}.
+                <h1 className="mb-1 text-center text-[1.75rem] font-bold tracking-[-0.03em] text-text-1" style={{ fontFamily: "var(--font-display)" }}>
+                  Welcome to Operator.
                 </h1>
-                {renderComposer(false)}
+                <p className="mb-5 text-center text-[13px] text-text-3">Your AI agent. Ready to research, build, and think.</p>
+                {pendingClarifyingQuestions && pendingResearchQuery ? (
+                  <ClarifyingQuestionsBar
+                    questions={pendingClarifyingQuestions}
+                    originalQuery={pendingResearchQuery}
+                    onSubmit={(answers) =>
+                      void sendMessageWithClarifications(pendingResearchQuery, answers)
+                    }
+                    onSkip={() =>
+                      void sendMessageWithClarifications(pendingResearchQuery ?? "", {})
+                    }
+                  />
+                ) : (
+                  renderComposer(false)
+                )}
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((item) => (
+                  {!pendingClarifyingQuestions && SUGGESTIONS.map((item) => (
                     <button
                       type="button"
                       key={item}
@@ -1462,7 +1677,7 @@ export function ChatShell() {
                             <div className="msg-user">
                               <p className="whitespace-pre-wrap">{message.content}</p>
                             </div>
-                            <div className="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            <div className="flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1493,89 +1708,30 @@ export function ChatShell() {
                       ) : (
                         <div className="msg-assistant">
 
-                          {/* ── Live tool events (during streaming) ── */}
-                          {isStreaming &&
-                            index === messages.length - 1 &&
-                            (activeToolActivity?.tool === "web_search" || activeSearchResults) && (
-                            <div className="tool-events-container">
-                              {/* Web search — running state */}
-                              {activeToolActivity &&
-                                activeToolActivity.tool === "web_search" &&
-                                activeToolActivity.status === "running" && (
-                                  <WebSearchBlock
-                                    status="running"
-                                    query={activeToolActivity.query}
-                                  />
-                                )}
-
-                              {/* Web search — completed (results available, still streaming tokens) */}
-                              {activeSearchResults && (
-                                <WebSearchBlock
-                                  status="completed"
-                                  query={activeSearchResults.query}
-                                  results={activeSearchResults.results}
-                                  resultCount={activeSearchResults.result_count}
-                                />
-                              )}
+                          {/* ── ThinkingBlock — collapsible reasoning accordion ── */}
+                          {((isStreaming && index === messages.length - 1 &&
+                            (thinkEnabled || (message.thinkingContent?.length ?? 0) > 0)) ||
+                            (!isStreaming && (message.thinkingContent?.length ?? 0) > 0)) && (
+                            <div className="mb-2">
+                              <ThinkingBlock
+                                content={message.thinkingContent ?? ""}
+                                seconds={
+                                  isStreaming && index === messages.length - 1
+                                    ? thinkingSeconds
+                                    : (message.thinkingSeconds ?? 0)
+                                }
+                                isStreaming={isStreaming && index === messages.length - 1}
+                              />
                             </div>
                           )}
 
-                          {/* ── Persisted tool events (after streaming / session load) ── */}
-                          {(!isStreaming || index < messages.length - 1) &&
-                            message.toolEvents &&
-                            message.toolEvents.some((e) => e.type === "web_search") && (
-                              <div className="tool-events-container">
-                                {message.toolEvents.map((event, ei) => {
-                                  if (event.type === "date_check") {
-                                    // Date check is silent — injected into context but not shown in UI
-                                    return null;
-                                  }
-                                  if (event.type === "web_search") {
-                                    if (
-                                      event.status === "error" ||
-                                      event.results.length === 0
-                                    ) {
-                                      return (
-                                        <WebSearchBlock
-                                          key={event.search_id || `err-${ei}`}
-                                          status="error"
-                                          query={event.query}
-                                          errorMessage={event.message}
-                                        />
-                                      );
-                                    }
-                                    return (
-                                      <WebSearchBlock
-                                        key={event.search_id || `search-${ei}`}
-                                        status="completed"
-                                        query={event.query}
-                                        results={event.results}
-                                        resultCount={event.result_count}
-                                      />
-                                    );
-                                  }
-                                  return null;
-                                })}
-                              </div>
-                            )}
-
                           {message.content ? (
                             <>
-                              {thoughtForSeconds !== null &&
-                                index === messages.length - 1 && (
-                                  <div
-                                    className="thought-badge"
-                                    aria-label={`Agent thought for ${thoughtForSeconds} seconds`}
-                                  >
-                                    <span className="thought-dot" />
-                                    Thought for {thoughtForSeconds}s
-                                  </div>
-                                )}
 
                               {(() => {
                                 const isCurrentMsg = isStreaming && index === messages.length - 1;
-                                if (isCurrentMsg) {
-                                  // Streaming: hide partial artifact block, StreamingArtifactCard shows below
+                                // Streaming with no artifact yet — strip partial XML (fallback path)
+                                if (isCurrentMsg && !message.artifactId) {
                                   return (
                                     <div className="markdown-content">
                                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -1622,6 +1778,68 @@ export function ChatShell() {
                                 );
                               })()}
 
+                              {/* ── Live tool events (during streaming) — rendered after content ── */}
+                              {isStreaming &&
+                                index === messages.length - 1 &&
+                                (activeToolActivity?.tool === "web_search" || activeSearchResults) && (
+                                <div className="tool-events-container mt-2">
+                                  {activeToolActivity &&
+                                    activeToolActivity.tool === "web_search" &&
+                                    activeToolActivity.status === "running" && (
+                                      <WebSearchBlock
+                                        status="running"
+                                        query={activeToolActivity.query}
+                                      />
+                                    )}
+                                  {activeSearchResults && (
+                                    <WebSearchBlock
+                                      status="completed"
+                                      query={activeSearchResults.query}
+                                      results={activeSearchResults.results}
+                                      resultCount={activeSearchResults.result_count}
+                                    />
+                                  )}
+                                </div>
+                              )}
+
+                              {/* ── Persisted tool events — rendered after content ── */}
+                              {(!isStreaming || index < messages.length - 1) &&
+                                message.toolEvents &&
+                                message.toolEvents.some((e) => e.type === "web_search") && (
+                                  <div className="tool-events-container mt-2">
+                                    {message.toolEvents.map((event, ei) => {
+                                      if (event.type === "date_check") {
+                                        return null;
+                                      }
+                                      if (event.type === "web_search") {
+                                        if (
+                                          event.status === "error" ||
+                                          event.results.length === 0
+                                        ) {
+                                          return (
+                                            <WebSearchBlock
+                                              key={event.search_id || `err-${ei}`}
+                                              status="error"
+                                              query={event.query}
+                                              errorMessage={event.message}
+                                            />
+                                          );
+                                        }
+                                        return (
+                                          <WebSearchBlock
+                                            key={event.search_id || `search-${ei}`}
+                                            status="completed"
+                                            query={event.query}
+                                            results={event.results}
+                                            resultCount={event.result_count}
+                                          />
+                                        );
+                                      }
+                                      return null;
+                                    })}
+                                  </div>
+                                )}
+
                               {(!isStreaming || index < messages.length - 1) && (
                                 <div className="mt-3 flex items-center gap-2">
                                   <button
@@ -1646,24 +1864,6 @@ export function ChatShell() {
                                   </button>
                                 </div>
                               )}
-                              {/* Mid-stream pause indicator */}
-                              {isStreaming &&
-                                streamPaused &&
-                                index === messages.length - 1 && (
-                                  <div
-                                    className="mt-3 flex items-center gap-2"
-                                    aria-live="polite"
-                                  >
-                                    <span className="thinking-dots">
-                                      <span />
-                                      <span />
-                                      <span />
-                                    </span>
-                                    <span className="text-[12px] text-text-3">
-                                      Still generating…
-                                    </span>
-                                  </div>
-                                )}
                               {/* Streaming card: shown while artifact is being written into the panel */}
                               {isStreaming &&
                                 index === messages.length - 1 &&
@@ -1674,10 +1874,7 @@ export function ChatShell() {
                                       title={streamingArtifact?.title ?? "Artifact"}
                                       type={streamingArtifact?.type ?? "markdown"}
                                       onOpen={() => {
-                                        // User explicitly wants to see the panel — clear the closed flag
                                         userClosedPanelRef.current = false;
-                                        // Clear any selected artifact so the panel shows the STREAMING preview,
-                                        // not the previously completed artifact
                                         setSelectedArtifactId(null);
                                         setIsArtifactPanelOpen(true);
                                         setIsFilesPanelOpen(false);
@@ -1694,31 +1891,53 @@ export function ChatShell() {
                                 )}
                             </>
                           ) : isStreaming &&
-                            index === messages.length - 1 &&
-                            !activeToolActivity &&
-                            !activeSearchResults ? (
-                            <div
-                              className="thinking-indicator"
-                              aria-live="polite"
-                              aria-label={
-                                streamPaused
-                                  ? "Still generating, please wait"
-                                  : "Agent is thinking"
-                              }
-                            >
-                              <span className="thinking-dots">
-                                <span />
-                                <span />
-                                <span />
-                              </span>
-                              <span className="thinking-label">
-                                {streamPaused
-                                  ? "Still generating…"
-                                  : thinkingSeconds > 0
-                                    ? `Thinking… ${thinkingSeconds}s`
-                                    : "Thinking…"}
-                              </span>
-                            </div>
+                            index === messages.length - 1 ? (
+                            <>
+                              {/* Live tool events when there is no response text yet */}
+                              {(activeToolActivity?.tool === "web_search" || activeSearchResults) && (
+                                <div className="tool-events-container">
+                                  {activeToolActivity &&
+                                    activeToolActivity.tool === "web_search" &&
+                                    activeToolActivity.status === "running" && (
+                                      <WebSearchBlock
+                                        status="running"
+                                        query={activeToolActivity.query}
+                                      />
+                                    )}
+                                  {activeSearchResults && (
+                                    <WebSearchBlock
+                                      status="completed"
+                                      query={activeSearchResults.query}
+                                      results={activeSearchResults.results}
+                                      resultCount={activeSearchResults.result_count}
+                                    />
+                                  )}
+                                </div>
+                              )}
+                              {/* Generating indicator — shown when no content and no active tool */}
+                              {!activeToolActivity && !activeSearchResults && (
+                                <div
+                                  className="tool-block"
+                                  aria-live="polite"
+                                  aria-label={
+                                    streamPaused
+                                      ? "Model is taking longer than usual – stop to retry"
+                                      : "Agent is generating a response"
+                                  }
+                                >
+                                  <div className="tb-header">
+                                    <span className="tb-spinner" aria-hidden="true" />
+                                    <span className="tb-title">
+                                      {streamPaused
+                                        ? <>Taking longer than usual…&nbsp;<span style={{opacity:0.5, fontWeight:400}}>stop to retry</span></>
+                                        : thinkingSeconds > 0
+                                          ? `Generating\u2026 ${thinkingSeconds}s`
+                                          : "Generating\u2026"}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           ) : null}
                         </div>
                       )}
@@ -1739,7 +1958,20 @@ export function ChatShell() {
 
               <div className="shrink-0 px-4 pb-5 pt-2 md:px-6">
                 <div className="mx-auto w-full max-w-[760px]">
-                  {renderComposer(true)}
+                  {pendingClarifyingQuestions && pendingResearchQuery ? (
+                    <ClarifyingQuestionsBar
+                      questions={pendingClarifyingQuestions}
+                      originalQuery={pendingResearchQuery}
+                      onSubmit={(answers) =>
+                        void sendMessageWithClarifications(pendingResearchQuery, answers)
+                      }
+                      onSkip={() =>
+                        void sendMessageWithClarifications(pendingResearchQuery ?? "", {})
+                      }
+                    />
+                  ) : (
+                    renderComposer(true)
+                  )}
                 </div>
               </div>
             </>

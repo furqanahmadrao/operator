@@ -58,6 +58,9 @@ export function ArtifactCard({ artifact, onOpen }: ArtifactCardProps) {
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="artifact-type-badge">{meta.badge}</span>
           <span className="text-[11px] text-text-3">{meta.label}</span>
+          {artifact.version > 1 && (
+            <span className="text-[10px] text-text-3 opacity-60">v{artifact.version}</span>
+          )}
         </div>
       </div>
 

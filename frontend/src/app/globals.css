@@ -2,64 +2,64 @@
 
 /* ─────────────────────────────────────────────────────────────────────────────
    DESIGN TOKENS
-   Warm neutral dark — inspired by ChatGPT / Claude dark palettes
-   Inter font — industry standard for professional dense UIs
+   Swiss Focus — light mode, electric blue accent, 0px border radius
+   Space Grotesk (display) + Inter (body) — precision informational UI
 ───────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Surfaces — deep monochrome, premium dark */
-  --bg:              #0f0f0f;
-  --surface-1:       #181818;
-  --surface-2:       #1e1e1e;
-  --surface-3:       #2a2a2a;
-  --surface-4:       #363636;
-  --surface-overlay: rgba(0, 0, 0, 0.72);
+  /* Surfaces — warm paper-white light mode */
+  --bg:              #F4F4F0;
+  --surface-1:       #FFFFFF;
+  --surface-2:       #F6F6F8;
+  --surface-3:       #EBEBEB;
+  --surface-4:       #DEDEDE;
+  --surface-overlay: rgba(0, 0, 0, 0.35);
 
-  /* Borders — very subtle, rgba-based */
-  --border:          rgba(255, 255, 255, 0.07);
-  --border-strong:   rgba(255, 255, 255, 0.13);
-  --border-accent:   rgba(255, 255, 255, 0.15);
+  /* Borders — clean, solid on white */
+  --border:          #E5E5E5;
+  --border-strong:   #CCCCCC;
+  --border-accent:   rgba(17, 17, 212, 0.2);
 
-  /* Text — crisp white hierarchy */
-  --text-1:          #ebebeb;
-  --text-2:          #999999;
-  --text-3:          #555555;
+  /* Text — dark hierarchy on light background */
+  --text-1:          #111111;
+  --text-2:          #555555;
+  --text-3:          #999999;
 
-  /* Accent — pure white / off-white (monochrome primary) */
-  --accent:          #ffffff;
-  --accent-strong:   #f0f0f0;
-  --accent-soft:     rgba(255, 255, 255, 0.05);
-  --accent-border:   rgba(255, 255, 255, 0.12);
+  /* Accent — electric blue */
+  --accent:          #1111d4;
+  --accent-strong:   #0d0d9a;
+  --accent-soft:     rgba(17, 17, 212, 0.07);
+  --accent-border:   rgba(17, 17, 212, 0.2);
 
-  /* Semantic — muted, functional */
-  --success:         #888888;
-  --success-soft:    rgba(255, 255, 255, 0.04);
-  --success-border:  rgba(255, 255, 255, 0.09);
-  --danger:          #c47a7a;
-  --danger-soft:     rgba(180, 100, 100, 0.08);
-  --danger-border:   rgba(180, 100, 100, 0.22);
-  --warning:         #888888;
-  --warning-soft:    rgba(255, 255, 255, 0.04);
+  /* Semantic — functional colours on white */
+  --success:         #1a7a2e;
+  --success-soft:    rgba(26, 122, 46, 0.08);
+  --success-border:  rgba(26, 122, 46, 0.2);
+  --danger:          #c42b2b;
+  --danger-soft:     rgba(196, 43, 43, 0.07);
+  --danger-border:   rgba(196, 43, 43, 0.2);
+  --warning:         #a05c00;
+  --warning-soft:    rgba(160, 92, 0, 0.07);
 
   /* Focus / shadow */
-  --focus-ring:  rgba(255, 255, 255, 0.5);
-  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md:   0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-lg:   0 24px 56px rgba(0, 0, 0, 0.7);
-  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --focus-ring:  rgba(17, 17, 212, 0.35);
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md:   0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg:   0 12px 40px rgba(0, 0, 0, 0.14);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 
   /* Composer elevation */
   --composer-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 4px 12px rgba(0, 0, 0, 0.5),
-    0 16px 40px rgba(0, 0, 0, 0.35);
+    0 0 0 1px #E5E5E5,
+    0 2px 8px rgba(0, 0, 0, 0.07),
+    0 8px 24px rgba(0, 0, 0, 0.05);
   --composer-shadow-focus:
-    0 0 0 1px rgba(255, 255, 255, 0.11),
-    0 4px 16px rgba(0, 0, 0, 0.6),
-    0 20px 48px rgba(0, 0, 0, 0.42);
+    0 0 0 1px rgba(17, 17, 212, 0.25),
+    0 2px 12px rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.06);
 
   --sidebar-width: 260px;
-  --sidebar-bg:     #131313;
+  --sidebar-bg:     #FFFFFF;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -67,6 +67,7 @@
 ───────────────────────────────────────────────────────────────────────────── */
 
 @theme inline {
+  --font-display: var(--font-display, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
   --font-sans: var(--font-inter, ui-sans-serif, system-ui, -apple-system, sans-serif);
   --font-mono: var(--font-mono, ui-monospace, "JetBrains Mono", monospace);
 
@@ -100,6 +101,17 @@
   --color-warning-soft:    var(--warning-soft);
 
   --color-focus-ring:      var(--focus-ring);
+
+  /* Swiss Focus: 0px radius everywhere; only rounded-full stays circular */
+  --radius-xs:   0px;
+  --radius-sm:   0px;
+  --radius:      0px;
+  --radius-md:   0px;
+  --radius-lg:   0px;
+  --radius-xl:   0px;
+  --radius-2xl:  0px;
+  --radius-3xl:  0px;
+  --radius-full: 9999px;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -142,45 +154,45 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .icon-btn {
-  @apply inline-flex items-center justify-center rounded-lg border border-transparent
+  @apply inline-flex items-center justify-center border border-transparent
          text-text-3 transition-colors duration-100
          hover:bg-surface-3 hover:text-text-2
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
 }
 
 .soft-btn {
-  @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent
+  @apply inline-flex h-8 w-8 items-center justify-center border border-transparent
          text-text-3 transition-colors duration-100
          hover:bg-surface-3 hover:text-text-2
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
 }
 
 .chip-btn {
-  @apply rounded-xl border border-border bg-surface-2 px-4 py-2
+  @apply border border-border bg-surface-2 px-4 py-2
          text-[13px] font-normal text-text-2 transition-colors duration-100
          hover:border-border-strong hover:bg-surface-3 hover:text-text-1
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg
-         bg-white px-4 py-2 text-sm font-medium text-[#0a0a0a]
+  @apply inline-flex items-center justify-center gap-2
+         bg-accent px-4 py-2 text-sm font-medium text-white
          transition-colors duration-100
-         hover:bg-[#e8e8e8]
+         hover:bg-accent-strong
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg
          disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-text-3;
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg
-         border border-border bg-surface-2 px-4 py-2 text-sm font-medium text-text-1
+  @apply inline-flex items-center justify-center gap-2
+         border border-border bg-surface-1 px-4 py-2 text-sm font-medium text-text-1
          transition-colors duration-100
          hover:border-border-strong hover:bg-surface-3
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
 }
 
 .btn-danger {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg
+  @apply inline-flex items-center justify-center gap-2
          border border-danger-border bg-danger-soft px-4 py-2 text-sm font-medium text-danger
          transition-colors duration-100
          hover:bg-danger-soft
@@ -189,27 +201,23 @@ body {
 
 /* ─────────────────────────────────────────────────────────────────────────────
    SIDEBAR NAV
-   Background: #131313  —  contrast analysis:
-   • text-text-3 (#555555) → 1.95:1  — FAILS WCAG AA (unusable for body text)
-   • text-text-2 (#999999) → 5.30:1  — PASSES AA ✓
-   • text-text-1 (#ebebeb) → 13.2:1  — PASSES AAA ✓
-   Inactive items use text-text-2 for readable contrast.
-   Active item matches composer bar surface (#1e1e1e) for visual consistency.
+   Background: --sidebar-bg (#FFFFFF) — light theme
+   Active item uses accent left border for selection indicator.
 ───────────────────────────────────────────────────────────────────────────── */
 
 .session-item {
-  @apply flex w-full items-center gap-2 rounded-lg px-3 py-2
+  @apply flex w-full items-center gap-2 px-3 py-2
          text-[13px] font-normal text-text-2 transition-colors duration-100
          hover:bg-surface-2 hover:text-text-1
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring;
 }
 
 .session-item-active {
-  /* bg matches composer bar (#1e1e1e = surface-2). Left rule marks selection. */
-  background: #1e1e1e;
+  /* accent left rule marks active session */
+  background: var(--surface-2);
   color: var(--text-1);
   padding-left: calc(0.75rem - 2px);
-  border-left: 2px solid rgba(255, 255, 255, 0.22);
+  border-left: 2px solid var(--accent);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -217,7 +225,7 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .dock-surface {
-  @apply rounded-2xl border border-border bg-surface-2 px-4 pt-3 pb-2.5
+  @apply border border-border bg-surface-2 px-4 pt-3 pb-2.5
          transition-[border-color,box-shadow] duration-200
          focus-within:border-border-strong;
   box-shadow: var(--composer-shadow);
@@ -231,46 +239,62 @@ body {
 }
 
 .composer-card {
-  @apply rounded-2xl border border-border bg-surface-2 px-4 pt-3 pb-2.5
-         transition-[border-color,box-shadow] duration-200
-         focus-within:border-border-strong;
-  box-shadow: var(--composer-shadow);
+  /* Outer shell — matches page bg (#F4F4F0) so white inner box pops */
+  @apply flex flex-col gap-0 bg-bg px-3 pt-3 pb-3;
 }
 
 .composer-card:focus-within {
-  box-shadow: var(--composer-shadow-focus);
+  box-shadow: none;
+}
+
+/* Inner white textarea container with clear black border */
+.composer-input-box {
+  background: var(--surface-1);
+  border: 1.5px solid #111111;
+  /* Positioned parent so .composer-dropdown-full spans the full box width */
+  position: relative;
+}
+
+/* Box-shaped action buttons — Attach, Mic, Send */
+.composer-action-btn {
+  @apply inline-flex h-7 w-7 items-center justify-center
+         border border-border
+         transition-colors duration-100
+         focus-visible:outline-none;
+  /* No default text color — each call site sets it explicitly */
 }
 
 .composer-textarea {
-  @apply max-h-[180px] min-h-[22px] w-full resize-none overflow-y-auto
+  @apply max-h-[220px] min-h-[80px] w-full resize-none overflow-y-auto
          bg-transparent leading-[1.65] text-text-1
          placeholder:text-text-3
          focus:outline-none;
   font-size: 14.5px;
   font-weight: 400;
+  /* padding: top/sides for text; no right padding needed since send is in the action row */
+  padding: 0.625rem 0.75rem 0.375rem;
 }
 
+/* Send / stop: plain icon button — no bg, no border, no rounded corners */
 .composer-send {
-  @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full
-         bg-[#dcdcdc] text-[#0a0a0a]
-         transition-colors duration-100
-         hover:bg-white
-         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2
-         disabled:cursor-not-allowed disabled:bg-surface-3 disabled:text-text-3;
+  @apply inline-flex items-center justify-center p-1
+         text-text-3 transition-colors duration-100
+         hover:text-accent
+         focus-visible:outline-none
+         disabled:cursor-not-allowed disabled:opacity-30;
 }
 
-/* Stop generation button — outlined circle with filled square */
+/* Stop generation button */
 .composer-stop {
-  @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full
-         border border-[rgba(255,255,255,0.18)] text-text-2
-         transition-colors duration-100
-         hover:border-[rgba(255,255,255,0.38)] hover:text-text-1
-         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2;
+  @apply inline-flex items-center justify-center p-1
+         text-text-2 transition-colors duration-100
+         hover:text-text-1
+         focus-visible:outline-none;
 }
 
-/* Composer toolbar icon buttons (+, sliders, briefcase) */
+/* Icon button: flat square hover */
 .composer-icon-btn {
-  @apply relative inline-flex h-7 w-7 items-center justify-center rounded-lg
+  @apply relative inline-flex h-7 w-7 items-center justify-center
          text-text-3 transition-colors duration-100
          hover:bg-surface-3 hover:text-text-2
          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring;
@@ -281,12 +305,12 @@ body {
   position: absolute;
   left: 0;
   min-width: 220px;
-  border-radius: 0.75rem;
+  border-radius: 0;
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: var(--surface-1);
   padding-top: 0.375rem;
   padding-bottom: 0.375rem;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 0 0 1px var(--border);
   z-index: 50;
   /* default: opens downward */
   top: 100%;
@@ -294,6 +318,27 @@ body {
 }
 /* When composer is pinned to bottom, open upward */
 .composer-dropdown-up {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+/* Full-width variant — stretches to match the composer card width */
+.composer-dropdown-full {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 0 0 1px var(--border);
+  z-index: 50;
+  top: 100%;
+  margin-top: 8px;
+}
+.composer-dropdown-full.composer-dropdown-up {
   top: auto;
   bottom: 100%;
   margin-top: 0;
@@ -345,10 +390,10 @@ body {
   outline: none;
 }
 .composer-toggle-off {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface-4);
 }
 .composer-toggle-on {
-  background: #ffffff;
+  background: var(--accent);
 }
 .composer-toggle-thumb {
   position: absolute;
@@ -357,20 +402,20 @@ body {
   height: 14px;
   border-radius: 9999px;
   transition: transform 180ms ease, background-color 180ms ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 .composer-toggle-off .composer-toggle-thumb {
   transform: translateX(3px);
-  background: rgba(255, 255, 255, 0.45);
+  background: #FFFFFF;
 }
 .composer-toggle-on .composer-toggle-thumb {
   transform: translateX(19px);
-  background: #111111;
+  background: #FFFFFF;
 }
 
-/* Active tool pill — appears inline in the composer toolbar */
+/* Active tool pill — now unused (replaced by inline checkboxes); kept for legacy */
 .tool-active-pill {
-  @apply inline-flex shrink-0 items-center gap-1 rounded-full
+  @apply inline-flex shrink-0 items-center gap-1
          border border-border bg-surface-3
          px-2 py-0.5
          text-[11px] font-medium text-text-2
@@ -383,10 +428,10 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .msg-user {
-  @apply max-w-[72%] rounded-2xl rounded-br-sm
+  @apply max-w-[72%]
          px-3.5 py-2.5 text-[14.5px] leading-[1.65] text-text-1;
-  background: #252525;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: #ECEEF4;
+  border: 1px solid #DDE0EC;
 }
 
 .msg-assistant {
@@ -395,7 +440,7 @@ body {
 
 /* Tool buttons — copy / edit — shown on hover or always for responses */
 .msg-tool-btn {
-  @apply inline-flex items-center justify-center rounded-md
+  @apply inline-flex items-center justify-center
          px-2 py-1 text-text-3
          transition-colors duration-100
          hover:bg-surface-3 hover:text-text-2
@@ -404,8 +449,8 @@ body {
 
 /* Inline edit textarea for user messages */
 .msg-edit-textarea {
-  @apply w-full resize-none rounded-2xl rounded-br-sm border border-border-strong
-         bg-surface-3 px-3.5 py-2.5 text-[14.5px] leading-[1.65] text-text-1
+  @apply w-full resize-none border border-border-strong
+         bg-surface-1 px-3.5 py-2.5 text-[14.5px] leading-[1.65] text-text-1
          focus:outline-none;
   max-height: 300px;
   overflow-y: auto;
@@ -413,16 +458,16 @@ body {
 
 /* Edit action buttons */
 .msg-action-btn {
-  @apply rounded-lg px-3 py-1.5 text-[12px] font-medium
+  @apply px-3 py-1.5 text-[12px] font-medium
          transition-colors duration-100
          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring;
 }
 
 .msg-action-btn-primary {
-  @apply inline-flex items-center rounded-lg bg-[#e8e8e8] px-3 py-1.5
-         text-[12px] font-medium text-[#111]
+  @apply inline-flex items-center bg-accent px-3 py-1.5
+         text-[12px] font-medium text-white
          transition-colors duration-100
-         hover:bg-white
+         hover:bg-accent-strong
          disabled:cursor-not-allowed disabled:opacity-40
          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring;
 }
@@ -432,7 +477,7 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .status-badge {
-  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5
+  @apply inline-flex items-center gap-1.5 px-2.5 py-0.5
          text-[11px] font-medium tracking-wide;
 }
 
@@ -449,7 +494,7 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .status-card {
-  @apply rounded-xl border px-4 py-3 text-sm;
+  @apply border px-4 py-3 text-sm;
 }
 
 .status-card-error {
@@ -465,7 +510,7 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .state-panel {
-  @apply rounded-2xl border border-border bg-surface-2/50 p-6 backdrop-blur-sm md:p-8;
+  @apply border border-border bg-surface-2/50 p-6 backdrop-blur-sm md:p-8;
 }
 
 .state-title {
@@ -492,11 +537,11 @@ body {
 }
 
 .skeleton-row {
-  @apply h-3 rounded-full;
+  @apply h-3;
 }
 
 .skeleton-bubble {
-  @apply rounded-xl border border-border bg-surface-2 p-4;
+  @apply border border-border bg-surface-2 p-4;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -518,18 +563,25 @@ body {
    THINKING INDICATOR
 ───────────────────────────────────────────────────────────────────────────── */
 
-/* "Thinking…" shown while waiting for first token — now a proper row */
+/* "Thinking…" shown while waiting for first token — styled as a ToolBlock-lite row */
 .thinking-indicator {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
   animation: fadeIn 0.2s ease-out;
+  max-width: 520px;
 }
 
 .thinking-label {
   font-size: 12px;
-  font-weight: 400;
-  color: var(--text-3);
+  font-weight: 500;
+  color: var(--text-2);
   letter-spacing: 0.01em;
 }
 
@@ -537,7 +589,7 @@ body {
 .thinking-dots {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .thinking-dots span {
@@ -558,31 +610,27 @@ body {
   22%            { transform: translateY(-5px); opacity: 0.9; }
 }
 
-/* "Thought for Xs" — minimal inline label, no pill shape */
-.thought-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
+/* ─────────────────────────────────────────────────────────────────────────────
+   THINKING CONTENT (reasoning text inside ThinkingBlock dropdown body)
+   ThinkingBlock reuses ToolBlock for its header — only the body is custom.
+───────────────────────────────────────────────────────────────────────────── */
+
+.thinking-content {
+  padding: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.thinking-pre {
+  margin: 0;
+  padding: 10px 12px;
   font-size: 11.5px;
-  font-weight: 400;
+  font-family: var(--font-mono), monospace;
+  line-height: 1.65;
   color: var(--text-3);
-  margin-bottom: 0.6rem;
-  letter-spacing: 0.01em;
-  animation: thoughtBadgeEnter 0.25s ease-out both;
-}
-
-@keyframes thoughtBadgeEnter {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.thought-dot {
-  display: inline-block;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background-color: var(--text-3);
-  opacity: 0.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface-2);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -590,7 +638,7 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .artifact-generating-placeholder {
-  @apply flex items-center gap-2.5 rounded-xl border border-border px-4 py-2.5;
+  @apply flex items-center gap-2.5 border border-border px-4 py-2.5;
   background: var(--surface-2);
   animation: fadeIn 0.18s ease-out;
   max-width: 480px;
@@ -615,14 +663,14 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .rail-btn {
-  @apply inline-flex h-9 w-9 items-center justify-center rounded-xl
+  @apply inline-flex h-9 w-9 items-center justify-center
          text-text-3 transition-colors duration-100
          hover:bg-surface-3 hover:text-text-2
          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1;
 }
 
 .rail-btn-active {
-  @apply bg-surface-3 text-text-2;
+  @apply bg-accent-soft text-accent;
 }
 
 /* Pulse animation for status indicators */
@@ -647,7 +695,7 @@ body {
 .app-drawer-panel {
   @apply fixed inset-y-0 left-0 z-40 w-[264px] max-w-[85vw]
          border-r border-border bg-surface-1
-         shadow-[4px_0_32px_rgba(0,0,0,0.6)] md:hidden;
+         shadow-[4px_0_24px_rgba(0,0,0,0.12)] md:hidden;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -727,16 +775,16 @@ body {
 }
 
 .markdown-content a {
-  color: var(--text-2);
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(255, 255, 255, 0.2);
+  text-decoration-color: rgba(17, 17, 212, 0.3);
   transition: color 0.1s;
 }
 
 .markdown-content a:hover {
-  color: var(--text-1);
-  text-decoration-color: rgba(255, 255, 255, 0.4);
+  color: var(--accent-strong);
+  text-decoration-color: rgba(17, 17, 212, 0.6);
 }
 
 .markdown-content blockquote {
@@ -755,7 +803,7 @@ body {
 .markdown-content table {
   width: 100%;
   border-collapse: collapse;
-  border-radius: 0.75rem;
+  border-radius: 0;
   border: 1px solid var(--border);
   overflow: hidden;
 }
@@ -780,9 +828,9 @@ body {
 
 .markdown-content pre {
   overflow: hidden;
-  border-radius: 0.75rem;
+  border-radius: 0;
   border: 1px solid var(--border);
-  background-color: var(--surface-2);
+  background-color: #1a1a1a;
 }
 
 .markdown-content pre code {
@@ -797,7 +845,7 @@ body {
 }
 
 .markdown-content code {
-  border-radius: 0.375rem;
+  border-radius: 0;
   background-color: var(--surface-3);
   padding: 0.125rem 0.375rem;
   font-size: 13px;
@@ -882,7 +930,7 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .files-btn {
-  @apply inline-flex h-7 items-center gap-1.5 rounded-lg border border-border
+  @apply inline-flex h-7 items-center gap-1.5 border border-border
          bg-surface-2 px-2.5 text-[12px] font-medium text-text-3
          transition-colors duration-100
          hover:border-border-strong hover:bg-surface-3 hover:text-text-2
@@ -894,7 +942,7 @@ body {
 }
 
 .files-btn-badge {
-  @apply flex h-4 min-w-[16px] items-center justify-center rounded-full
+  @apply flex h-4 min-w-[16px] items-center justify-center
          bg-surface-3 px-1 text-[10px] font-semibold text-text-2;
 }
 
@@ -903,12 +951,12 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .code-block {
-  @apply my-3 overflow-hidden rounded-xl border border-border bg-[#141414];
+  @apply my-3 overflow-hidden border border-border bg-[#141414];
 }
 
 .code-block-header {
   @apply flex items-center justify-between border-b border-border px-4 py-2;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .code-block-lang {
@@ -916,7 +964,7 @@ body {
 }
 
 .code-block-copy-btn {
-  @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5
+  @apply inline-flex items-center gap-1.5 px-2 py-0.5
          text-[11px] font-medium text-text-3 transition-colors duration-100
          hover:bg-surface-3 hover:text-text-2;
 }
@@ -933,7 +981,7 @@ body {
 
 /* Inline code */
 .inline-code {
-  @apply rounded-md border border-border bg-surface-2 px-1.5 py-0.5
+  @apply border border-border bg-surface-2 px-1.5 py-0.5
          font-mono text-[12px] text-text-2;
   font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
 }
@@ -943,7 +991,7 @@ body {
 ───────────────────────────────────────────────────────────────────────────── */
 
 .artifact-item {
-  @apply flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5
+  @apply flex w-full cursor-pointer items-center gap-2 px-3 py-2.5
          text-left text-[13px] font-normal text-text-3
          transition-colors duration-100
          hover:bg-surface-2 hover:text-text-2
@@ -952,7 +1000,7 @@ body {
 
 .artifact-item-active {
   @apply bg-surface-2 text-text-1;
-  border-left: 2px solid rgba(255, 255, 255, 0.22);
+  border-left: 2px solid var(--accent);
   padding-left: calc(0.75rem - 2px);
 }
 
@@ -973,7 +1021,7 @@ body {
 }
 
 .artifact-action-btn {
-  @apply inline-flex h-7 w-7 items-center justify-center rounded-lg
+  @apply inline-flex h-7 w-7 items-center justify-center
          text-text-3 transition-colors duration-100
          hover:bg-surface-3 hover:text-text-2
          focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring
@@ -1007,7 +1055,7 @@ body {
 
 .split-resize-handle:hover::after,
 .split-resize-handle:active::after {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--border-strong);
   width: 2px;
   left: 1.5px;
 }
@@ -1061,9 +1109,9 @@ body {
   width: 100%;
   max-width: 480px;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-2);
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
   text-align: left;
@@ -1071,8 +1119,8 @@ body {
 }
 
 .artifact-chat-card:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-3);
+  border-color: var(--accent);
+  background: var(--surface-2);
 }
 
 .artifact-chat-card:focus-visible {
@@ -1086,8 +1134,8 @@ body {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0;
+  background: var(--surface-3);
   color: var(--text-2);
   flex-shrink: 0;
 }
@@ -1097,9 +1145,9 @@ body {
   align-items: center;
   gap: 5px;
   padding: 5px 10px;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid var(--border);
-  background: var(--surface-3);
+  background: var(--surface-2);
   color: var(--text-2);
   font-size: 12px;
   font-weight: 500;
@@ -1109,8 +1157,8 @@ body {
 }
 
 .artifact-chat-card-download:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-4);
+  border-color: var(--accent);
+  background: var(--surface-3);
   color: var(--text-1);
 }
 
@@ -1123,7 +1171,7 @@ body {
   align-items: center;
   gap: 2px;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--surface-3);
   flex-shrink: 0;
 }
@@ -1132,8 +1180,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 3px 10px;
+  border-radius: 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-3);
@@ -1152,7 +1200,8 @@ body {
 .artifact-panel-toggle-btn-active {
   color: var(--text-1) !important;
   background: var(--surface-1) !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border-bottom: 2px solid var(--accent);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1164,9 +1213,9 @@ body {
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid var(--border);
-  background: var(--surface-3);
+  background: var(--surface-2);
   font-size: 12px;
   font-weight: 500;
   color: var(--text-2);
@@ -1176,7 +1225,7 @@ body {
 
 .artifact-panel-action-btn:hover {
   border-color: var(--border-strong);
-  background: var(--surface-4);
+  background: var(--surface-3);
   color: var(--text-1);
 }
 
@@ -1208,7 +1257,7 @@ body {
   gap: 8px;
   width: 100%;
   padding: 7px 10px;
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 12.5px;
   font-weight: 400;
   color: var(--text-3);
@@ -1217,7 +1266,7 @@ body {
 }
 
 .sidebar-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-3);
   color: var(--text-2);
 }
 
@@ -1229,13 +1278,11 @@ body {
   position: fixed;
   z-index: 9999;
   min-width: 164px;
-  background: #1f1f1f;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 4px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.72),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--border);
   animation: fadeInScale 0.1s ease-out;
   transform-origin: top right;
 }
@@ -1251,7 +1298,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  border-radius: 7px;
+  border-radius: 0;
   font-size: 12.5px;
   font-weight: 400;
   color: var(--text-2);
@@ -1263,7 +1310,7 @@ body {
 }
 
 .session-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-3);
   color: var(--text-1);
 }
 
@@ -1275,7 +1322,7 @@ body {
 
 .session-dropdown-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border);
   margin: 3px 4px;
 }
 
@@ -1304,7 +1351,7 @@ body {
   padding: 11px 14px;
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
   text-decoration: none;
@@ -1312,7 +1359,7 @@ body {
 }
 
 .library-card:hover {
-  border-color: var(--border-strong);
+  border-color: var(--accent);
   background: var(--surface-2);
 }
 
@@ -1322,8 +1369,8 @@ body {
   justify-content: center;
   width: 30px;
   height: 30px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
+  background: var(--surface-3);
+  border-radius: 0;
   flex-shrink: 0;
   border: 1px solid var(--border);
 }
@@ -1333,8 +1380,8 @@ body {
   display: inline-flex;
   align-items: center;
   padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0;
+  background: var(--surface-3);
   border: 1px solid var(--border);
   font-size: 10px;
   font-weight: 600;
@@ -1350,7 +1397,7 @@ body {
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid transparent;
   background: transparent;
   font-size: 12px;
@@ -1377,16 +1424,16 @@ body {
   justify-content: center;
   min-width: 18px;
   padding: 1px 4px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  background: var(--surface-3);
   font-size: 10px;
   font-weight: 600;
   color: var(--text-3);
 }
 
 .library-filter-tab-active .library-filter-count {
-  background: rgba(255, 255, 255, 0.10);
-  color: var(--text-2);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1406,7 +1453,7 @@ body {
   padding: 18px;
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 0;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, transform 0.15s;
   text-decoration: none;
@@ -1414,7 +1461,7 @@ body {
 }
 
 .project-card:hover {
-  border-color: var(--border-strong);
+  border-color: var(--accent);
   background: var(--surface-2);
   transform: translateY(-1px);
 }
@@ -1428,16 +1475,16 @@ body {
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 13px;
   font-weight: 500;
-  background: var(--accent-strong);
-  color: #0a0a0a;
+  background: var(--accent);
+  color: #ffffff;
   border: none;
   cursor: pointer;
   transition: background 0.1s;
 }
-.btn-primary:hover   { background: var(--accent); }
+.btn-primary:hover   { background: var(--accent-strong); }
 .btn-primary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -1448,10 +1495,10 @@ body {
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 13px;
   font-weight: 500;
-  background: var(--surface-2);
+  background: var(--surface-1);
   color: var(--text-2);
   border: 1px solid var(--border);
   cursor: pointer;
@@ -1508,9 +1555,9 @@ body {
   right: 0;
   z-index: 200;
   min-width: 160px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 0;
   box-shadow: var(--shadow-md);
   padding: 4px;
   display: flex;
@@ -1659,22 +1706,33 @@ body {
    web search · date check · (future: sandbox, computer use, research …)
 ───────────────────────────────────────────────────────────────────────────── */
 
-/* Wrapper for one or more consecutive tool blocks above a response */
+/* Wrapper for one or more consecutive tool blocks — can appear above or within a response */
 .tool-events-container {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 12px;
   animation: fadeIn 0.18s ease-out;
+}
+
+/* When tool events appear above response content (historical at top) */
+.tool-events-container:first-child {
+  margin-bottom: 12px;
+}
+
+/* When tool events follow content inline (mt-2 is applied via className) */
+.tool-events-container.mt-2 {
+  margin-top: 8px;
+  margin-bottom: 0;
 }
 
 /* ── The block card ── */
 .tool-block {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--surface-1);
   overflow: hidden;
-  max-width: 520px;
+  /* Fill the message column — same visual width as the composer box */
+  width: 100%;
   animation: fadeIn 0.18s ease-out;
 }
 
@@ -1722,9 +1780,9 @@ button.tb-header-clickable:focus-visible {
   width: 9px;
   height: 9px;
   flex-shrink: 0;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.08);
-  border-top-color: var(--text-3);
+  border-radius: 0;
+  border: 1.5px solid var(--surface-3);
+  border-top-color: var(--accent);
   animation: tbSpin 0.75s linear infinite;
 }
 
@@ -1763,7 +1821,7 @@ button.tb-header-clickable:focus-visible {
 .tb-badge {
   background: var(--surface-3);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 1px 6px;
   font-size: 10.5px;
   font-weight: 600;
@@ -1828,7 +1886,7 @@ button.tb-header-clickable:focus-visible {
 .tb-source-favicon {
   width: 12px;
   height: 12px;
-  border-radius: 2px;
+  border-radius: 0;
   flex-shrink: 0;
   opacity: 0.7;
 }
@@ -1864,3 +1922,528 @@ button.tb-header-clickable:focus-visible {
   line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CLARIFYING QUESTIONS STEPPER
+   Step-by-step question flow that replaces the composer before deep research.
+───────────────────────────────────────────────────────────────────────────── */
+
+.cq-stepper {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.18s ease-out;
+  width: 100%;
+  overflow: hidden;
+}
+
+.cq-stepper-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.875rem 1.125rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.cq-stepper-icon {
+  color: var(--text-3);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.cq-stepper-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0 0 0.15rem;
+  line-height: 1.4;
+}
+
+.cq-stepper-subtitle {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0;
+  line-height: 1.4;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 520px;
+}
+
+.cq-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.65rem 1.125rem 0;
+}
+
+.cq-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, width 0.2s, border-radius 0.2s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.cq-dot:hover { background: var(--text-3); transform: scale(1.15); }
+
+.cq-dot-active {
+  background: var(--text-1) !important;
+  width: 18px !important;
+  border-radius: 4px !important;
+}
+
+.cq-dot-done { background: var(--text-3) !important; }
+
+.cq-body { padding: 0.65rem 1.125rem 1rem; }
+
+.cq-step-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 0 0 0.45rem;
+}
+
+.cq-type-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.cq-question-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-1);
+  margin: 0 0 0.875rem;
+  line-height: 1.5;
+}
+
+.cq-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cq-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 13px;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  line-height: 1.4;
+  width: 100%;
+}
+
+.cq-option:hover {
+  border-color: var(--accent-border);
+  color: var(--text-1);
+  background: var(--accent-soft);
+}
+
+.cq-option-sel {
+  border-color: var(--accent-border) !important;
+  background: var(--accent-soft) !important;
+  color: var(--text-1) !important;
+}
+
+.cq-option-other {
+  font-style: italic;
+  color: var(--text-3);
+  border-style: dashed;
+}
+
+.cq-radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  flex-shrink: 0;
+  transition: border-color 0.12s;
+}
+
+.cq-option-sel .cq-radio { border-color: var(--accent); }
+
+.cq-radio-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.cq-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  border: 1.5px solid var(--border-strong);
+  flex-shrink: 0;
+  transition: border-color 0.12s, background 0.12s;
+  color: #ffffff;
+}
+
+.cq-option-sel .cq-checkbox {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.cq-multi-count {
+  font-size: 11px;
+  color: var(--text-3);
+  margin: 0.2rem 0 0;
+  padding-left: 0.25rem;
+}
+
+.cq-text-input {
+  width: 100%;
+  font-size: 13px;
+  color: var(--text-1);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 0.4rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+  margin-top: 0.3rem;
+  animation: fadeIn 0.12s ease-out;
+}
+
+.cq-text-input:focus { border-color: var(--accent); }
+.cq-text-input::placeholder { color: var(--text-3); }
+
+.cq-textarea {
+  width: 100%;
+  font-size: 13px;
+  color: var(--text-1);
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s;
+  resize: none;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.cq-textarea:focus { border-color: var(--accent); }
+.cq-textarea::placeholder { color: var(--text-3); }
+
+.cq-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1.125rem;
+  border-top: 1px solid var(--border);
+}
+
+.cq-footer-left  { display: flex; align-items: center; gap: 0.5rem; }
+.cq-footer-right { display: flex; align-items: center; gap: 0.5rem; }
+
+.cq-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 12.5px;
+  color: var(--text-3);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.cq-back-btn:hover { color: var(--text-1); border-color: var(--border-strong); }
+
+.cq-skip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.275rem;
+  font-size: 12px;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.3rem 0.25rem;
+  transition: color 0.15s;
+}
+
+.cq-skip-btn:hover { color: var(--text-2); }
+
+.cq-skip-all-btn {
+  font-size: 12px;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.3rem 0.25rem;
+  transition: color 0.15s;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: transparent;
+}
+
+.cq-skip-all-btn:hover {
+  color: var(--text-2);
+  text-decoration-color: currentColor;
+}
+
+.cq-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.875rem !important;
+  font-size: 13px !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TODO WIDGET — integrated inside the composer
+   The widget sits between the tool-checkboxes row and the textarea,
+   providing a toggleable research-plan tracker directly in the prompt box.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Outer wrapper — flush with composer sides, no extra margin */
+.composer-todo-wrap {
+  margin-bottom: 8px;
+}
+
+/* Override todo-widget bottom-margin when inside composer */
+.composer-todo-wrap .todo-widget {
+  margin-bottom: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TODO WIDGET
+   Collapsible research-plan tracker rendered above the composer.
+───────────────────────────────────────────────────────────────────────────── */
+
+.todo-widget {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.todo-widget-complete { border-color: rgba(26, 122, 46, 0.3); }
+
+.todo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.45rem 0.875rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-2);
+  transition: background 0.12s;
+  gap: 0.5rem;
+}
+
+.todo-header:hover { background: var(--surface-3); }
+
+.todo-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-header-icon { color: var(--text-3); flex-shrink: 0; }
+
+.todo-header-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-header-count {
+  font-size: 10.5px;
+  color: var(--text-3);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.todo-header-chevron {
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.todo-progress-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  width: 56px;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.todo-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.45s ease;
+}
+
+.todo-widget-complete .todo-progress-fill { background: var(--success); }
+
+.todo-body {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0.875rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.18rem 0;
+}
+
+.todo-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.todo-item-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+.todo-item-active .todo-item-text { color: var(--text-1); font-weight: 500; }
+.todo-item-active .todo-item-icon { color: var(--text-2); }
+
+.todo-item-done .todo-item-text {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.todo-item-done .todo-item-icon { color: var(--success); }
+.todo-item-pending .todo-item-icon { color: var(--border-strong); }
+
+@keyframes todo-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.todo-spin { animation: todo-spin 1s linear infinite; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SETTINGS PAGE
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Tab bar — similar to library filter tabs but page-level */
+.settings-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px;
+  height: 40px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  margin-right: 20px;
+  transition: color 0.12s;
+}
+
+.settings-tab::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background 0.12s;
+}
+
+.settings-tab:hover {
+  color: var(--text-1);
+}
+
+.settings-tab-active {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.settings-tab-active::after {
+  background: var(--accent);
+}
+
+/* Form inputs */
+.settings-input {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 13px;
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  appearance: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.settings-input::placeholder {
+  color: var(--text-3);
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: rgba(17, 17, 212, 0.4);
+  box-shadow: 0 0 0 3px rgba(17, 17, 212, 0.08);
+}
+
+/* Remove default search input X in webkit */
+.settings-input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+

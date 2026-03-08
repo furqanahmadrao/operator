@@ -109,7 +109,25 @@ Verified against NVIDIA API catalog/docs:
 - Base URL: `https://integrate.api.nvidia.com/v1`
 - Chat endpoint: `POST /chat/completions`
 - Auth: Bearer token via `Authorization` header
-- Model: `deepseek-ai/deepseek-v3.1-terminus`
 - Streaming enabled with `stream: true`
 
-Note: model IDs and API catalog details can evolve. If NVIDIA updates naming or endpoint behavior, follow current official docs.
+The default model used in examples has been `deepseek-ai/deepseek-v3.1-terminus`,
+but the NVIDIA DeepSeek family is updated frequently.  Consult the official
+catalog to pick the best model; the following table summarizes the current
+options (as of early 2026) and their properties:
+
+| Model ID                             | Release | Max tokens | Reasoning support       | Notes / Recommendation |
+|-------------------------------------|---------|------------|-------------------------|-------------------------|
+| deepseek-ai/deepseek-r1             | 2023‑12 | ~8k        | yes (EOL)               | Retired – do not use    |
+| deepseek-ai/deepseek-v3.1-terminus  | 2024‑03 | 4k         | no / limited            | Baseline default        |
+| deepseek-ai/deepseek-v3.2-reasoning | 2024‑09 | 8k         | yes (built-in, <think>) | Recommended drop-in     |
+| deepseek-ai/deepseek-v4.0-unified   | 2025‑02 | 16k+       | yes (toggleable)        | Latest / highest cap    |
+
+To enable thinking-mode you can either set `NVIDIA_THINKING_MODEL` to a
+separate ID or leave it blank and the backend will reuse `NVIDIA_MODEL`.
+Because reasoning capabilities are now embedded in the same model, the
+frontend toggle `think_enabled` simply causes the server to send a low
+temperature and higher token budget; no separate “R1” model is required.
+
+Note: model availability and names may change; always verify against
+[the official NVIDIA docs or the `/v1/models` API](https://integrate.api.nvidia.com/v1/models).

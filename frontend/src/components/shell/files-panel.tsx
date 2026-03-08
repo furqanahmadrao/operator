@@ -37,15 +37,12 @@ export function FilesPanel({
     <aside
       aria-label="Session files"
       aria-hidden={!open}
-      className={`flex h-full shrink-0 flex-col overflow-hidden border-l transition-[width] duration-200 ease-out ${
-        open
-          ? "w-[220px] border-[rgba(255,255,255,0.05)]"
-          : "w-0 border-transparent"
+      className={`absolute inset-y-0 right-0 top-12 bottom-0 z-20 flex w-[220px] flex-col border-l border-border bg-surface-1 transition-transform duration-200 ease-in-out ${
+        open ? "translate-x-0" : "translate-x-full"
       }`}
-      style={{ background: "#131313" }}
     >
-      {/* List — no header label, just the items */}
-      <nav className="flex-1 overflow-y-auto py-2" aria-label="Files list">
+      {/* File list — no header, just items */}
+      <nav className="flex-1 overflow-y-auto pt-2 pb-1" aria-label="Files list">
         {artifacts.length === 0 ? (
           <p className="px-4 py-3 text-[12px] text-text-3">No files yet.</p>
         ) : (
@@ -62,9 +59,9 @@ export function FilesPanel({
                       onSelectArtifact(artifact.id);
                     }
                   }}
-                  className={`group flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors duration-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring ${
+                  className={`group flex cursor-pointer items-center gap-2 px-2.5 py-2 text-left transition-colors duration-200 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus-ring ${
                     artifact.id === selectedArtifactId
-                      ? "bg-surface-2 text-text-1"
+                      ? "border-l-2 border-accent bg-surface-2 pl-[calc(0.625rem-2px)] text-text-1"
                       : "text-text-3 hover:text-text-2"
                   }`}
                 >
@@ -75,7 +72,7 @@ export function FilesPanel({
                   <button
                     type="button"
                     onClick={(e) => void handleDownload(e, artifact)}
-                    className="shrink-0 rounded-md p-1 text-text-3 opacity-0 transition-all duration-100 hover:bg-surface-3 hover:text-text-2 focus-visible:outline-none focus-visible:opacity-100 group-hover:opacity-100"
+                    className="shrink-0 p-1 text-text-3 opacity-0 transition-all duration-200 hover:bg-surface-3 hover:text-text-2 focus-visible:outline-none focus-visible:opacity-100 group-hover:opacity-100"
                     aria-label={`Download ${artifact.title}`}
                     title="Download"
                   >

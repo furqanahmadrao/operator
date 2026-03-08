@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
   BookOpen,
   Code2,
   FileText,
@@ -11,6 +10,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { PageShell } from "@/components/shell/page-shell";
 
 import type { ArtifactWithSession } from "@/lib/artifacts-api";
 import { listAllArtifacts } from "@/lib/artifacts-api";
@@ -141,29 +141,25 @@ export default function LibraryPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-bg font-sans text-text-1">
-      {/* ── Sticky header ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 border-b border-[rgba(255,255,255,0.06)] bg-bg/95 backdrop-blur-md">
-        <div className="mx-auto max-w-[960px] px-5">
+    <PageShell>
+    <div className="min-h-full bg-bg font-sans text-text-1">
+      {/* ── Sticky top bar ───────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-10 border-b border-border bg-bg">
 
-          {/* Top row: back, title, search */}
-          <div className="flex items-center gap-4 py-3.5">
-            <Link href="/" className="icon-btn h-8 w-8" aria-label="Back to chat">
-              <ArrowLeft size={15} />
-            </Link>
-
+          {/* Fixed-height row: title + search */}
+          <div className="flex h-12 items-center gap-4 px-5">
             <div className="flex items-center gap-2">
-              <BookOpen size={15} className="shrink-0 text-text-3" />
-              <h1 className="text-[14px] font-semibold text-text-1">Library</h1>
+              <BookOpen size={14} className="shrink-0 text-text-3" />
+              <h1 className="text-[13px] font-semibold text-text-1">Library</h1>
               {!isLoading && artifacts.length > 0 && (
-                <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-text-3">
+                <span className="bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-text-3">
                   {artifacts.length}
                 </span>
               )}
             </div>
 
             {/* Search */}
-            <div className="ml-auto flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-1.5 focus-within:border-border-strong">
+            <div className="ml-auto flex items-center gap-2 border border-border bg-surface-2 px-3 py-1.5 focus-within:border-[#1111d4]/50">
               <Search size={12} className="shrink-0 text-text-3" />
               <input
                 type="search"
@@ -186,33 +182,33 @@ export default function LibraryPage() {
             </div>
           </div>
 
-          {/* Type filter tabs */}
-          {!isLoading && artifacts.length > 0 && (
-            <div className="flex items-center gap-1 pb-3">
-              {TYPE_FILTERS.map(({ value, label }) => {
-                if (value !== "all" && counts[value] === 0) return null;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setTypeFilter(value)}
-                    className={`library-filter-tab ${
-                      typeFilter === value ? "library-filter-tab-active" : ""
-                    }`}
-                    aria-pressed={typeFilter === value}
-                  >
-                    {label}
-                    <span className="library-filter-count">{counts[value]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </header>
 
       {/* ── Content ───────────────────────────────────────────────────────── */}
-      <main className="mx-auto max-w-[960px] px-5 py-8">
+      <main className="px-5 py-6 mx-auto max-w-[960px]">
+
+        {/* Filter bar — in content area, not in the top bar */}
+        {!isLoading && artifacts.length > 0 && (
+          <div className="mb-6 flex items-center gap-1">
+            {TYPE_FILTERS.map(({ value, label }) => {
+              if (value !== "all" && counts[value] === 0) return null;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTypeFilter(value)}
+                  className={`library-filter-tab ${
+                    typeFilter === value ? "library-filter-tab-active" : ""
+                  }`}
+                  aria-pressed={typeFilter === value}
+                >
+                  {label}
+                  <span className="library-filter-count">{counts[value]}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Loading */}
         {isLoading && (
@@ -317,5 +313,6 @@ export default function LibraryPage() {
         )}
       </main>
     </div>
+    </PageShell>
   );
 }

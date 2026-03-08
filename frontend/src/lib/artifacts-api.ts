@@ -5,8 +5,19 @@ export type Artifact = {
   type: string;
   title: string;
   content: string;
+  version: number;
   created_at: string;
   updated_at: string;
+};
+
+export type ArtifactRevision = {
+  id: string;
+  artifact_id: string;
+  version: number;
+  title: string;
+  content: string;
+  source_message_id: string | null;
+  created_at: string;
 };
 
 export type ArtifactWithSession = Artifact & {
@@ -34,6 +45,12 @@ export async function getArtifact(id: string): Promise<Artifact> {
   const res = await fetch(`${API_BASE}/api/artifacts/${id}`);
   if (!res.ok) throw new Error("Failed to load artifact");
   return res.json() as Promise<Artifact>;
+}
+
+export async function listArtifactRevisions(id: string): Promise<ArtifactRevision[]> {
+  const res = await fetch(`${API_BASE}/api/artifacts/${id}/revisions`);
+  if (!res.ok) throw new Error("Failed to list artifact revisions");
+  return res.json() as Promise<ArtifactRevision[]>;
 }
 
 export async function updateArtifact(

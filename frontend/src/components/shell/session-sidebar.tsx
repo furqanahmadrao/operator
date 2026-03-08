@@ -2,11 +2,8 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
-  BookOpen,
   Check,
-  FolderOpen,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -93,28 +90,13 @@ export function SessionSidebar({
       id="session-sidebar"
       aria-label="Chat history"
       aria-hidden={!open}
-      className={`flex h-full shrink-0 flex-col border-r ${
-        open
-          ? "w-[260px] border-[rgba(255,255,255,0.05)]"
-          : "w-0 overflow-hidden border-transparent"
+      className={`absolute left-0 top-12 bottom-0 z-20 flex w-[260px] flex-col border-r border-border bg-surface-1 transition-transform duration-200 ease-in-out ${
+        open ? "translate-x-0" : "-translate-x-full"
       }`}
-      style={{ background: "#131313" }}
     >
-      {/* Top nav: Library + Projects */}
-      <div className="shrink-0 space-y-px border-b border-[rgba(255,255,255,0.05)] p-2">
-        <Link href="/library" className="sidebar-nav-btn" aria-label="Library">
-          <BookOpen size={13} />
-          <span>Library</span>
-        </Link>
-        <Link href="/projects" className="sidebar-nav-btn" aria-label="Projects">
-          <FolderOpen size={13} />
-          <span>Projects</span>
-        </Link>
-      </div>
-
-      {/* Session list */}
+      {/* Session list — no header, starts with a small spacing */}
       <nav
-        className="flex-1 overflow-y-auto px-0 py-1"
+        className="flex-1 overflow-y-auto px-0 pt-2 pb-1"
         aria-label="Past chats"
       >
         {sessions.length === 0 ? (
@@ -250,7 +232,7 @@ function SessionItem({
   // ── Editing state ─────────────────────────────────────────────────────────
   if (isEditing) {
     return (
-      <div className="flex items-center gap-1 rounded-lg bg-surface-3 px-2 py-1.5">
+      <div className="flex items-center gap-1 bg-surface-3 px-2 py-1.5">
         <input
           ref={inputRef}
           value={editValue}
@@ -367,14 +349,14 @@ function SessionItem({
                       setMenuOpen(false);
                       await onDelete();
                     }}
-                    className="flex-1 rounded-md border border-danger-border bg-danger-soft px-2.5 py-1.5 text-[11.5px] font-medium text-danger transition-colors hover:bg-[rgba(180,100,100,0.14)] focus:outline-none"
+                    className="flex-1 border border-danger-border bg-danger-soft px-2.5 py-1.5 text-[11.5px] font-medium text-danger transition-colors hover:bg-[rgba(180,100,100,0.14)] focus:outline-none"
                   >
                     Delete
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmDelete(false)}
-                    className="flex-1 rounded-md border border-border bg-surface-2 px-2.5 py-1.5 text-[11.5px] font-medium text-text-2 transition-colors hover:bg-surface-3 hover:text-text-1 focus:outline-none"
+                    className="flex-1 border border-border bg-surface-2 px-2.5 py-1.5 text-[11.5px] font-medium text-text-2 transition-colors hover:bg-surface-3 hover:text-text-1 focus:outline-none"
                   >
                     Cancel
                   </button>

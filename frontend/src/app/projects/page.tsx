@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Folder, FolderOpen, Plus, X } from "lucide-react";
+import { Folder, FolderOpen, Plus, X } from "lucide-react";
+import { PageShell } from "@/components/shell/page-shell";
 
 import type { Project } from "@/lib/projects-api";
 import { createProject, listProjects } from "@/lib/projects-api";
@@ -62,17 +63,14 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-bg font-sans text-text-1">
-      {/* Sticky header */}
-      <header className="sticky top-0 z-10 border-b border-[rgba(255,255,255,0.06)] bg-bg/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[960px] items-center gap-4 px-5 py-3.5">
-          <Link href="/" className="icon-btn h-8 w-8" aria-label="Back to chat">
-            <ArrowLeft size={15} />
-          </Link>
-
+    <PageShell>
+    <div className="min-h-full bg-bg font-sans text-text-1">
+      {/* Sticky top bar */}
+      <header className="sticky top-0 z-10 border-b border-border bg-bg">
+        <div className="flex h-12 items-center gap-4 px-5">
           <div className="flex items-center gap-2">
-            <FolderOpen size={15} className="shrink-0 text-text-3" />
-            <h1 className="text-[14px] font-semibold text-text-1">Projects</h1>
+            <FolderOpen size={14} className="shrink-0 text-text-3" />
+            <h1 className="text-[13px] font-semibold text-text-1">Projects</h1>
           </div>
 
           <button
@@ -89,7 +87,7 @@ export default function ProjectsPage() {
       <main className="mx-auto max-w-[960px] px-5 py-8">
         {/* ── Create form ── */}
         {isCreating && (
-          <div className="mb-6 rounded-xl border border-[rgba(255,255,255,0.1)] bg-surface-2 p-5">
+          <div className="mb-6 border border-border bg-surface-1 p-5">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-[13px] font-semibold text-text-1">
                 New project
@@ -114,7 +112,7 @@ export default function ProjectsPage() {
                   if (e.key === "Escape") cancelCreate();
                 }}
                 placeholder="Project name…"
-                className="w-full rounded-lg border border-border bg-surface-3 px-3 py-2 text-[13px] text-text-1 placeholder:text-text-3 focus:border-border-strong focus:outline-none"
+                className="w-full border border-border bg-surface-2 px-3 py-2 text-[13px] text-text-1 placeholder:text-text-3 focus:border-[#1111d4] focus:outline-none"
                 autoFocus
               />
               <textarea
@@ -122,7 +120,7 @@ export default function ProjectsPage() {
                 onChange={(e) => setNewDesc(e.target.value)}
                 placeholder="Short description (optional)…"
                 rows={2}
-                className="w-full resize-none rounded-lg border border-border bg-surface-3 px-3 py-2 text-[13px] text-text-1 placeholder:text-text-3 focus:border-border-strong focus:outline-none"
+                className="w-full resize-none border border-border bg-surface-2 px-3 py-2 text-[13px] text-text-1 placeholder:text-text-3 focus:border-[#1111d4] focus:outline-none"
               />
             </div>
 
@@ -193,8 +191,8 @@ export default function ProjectsPage() {
               >
                 {/* Icon + name row */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-3">
-                    <FolderOpen size={15} className="text-text-3" />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-[rgba(17,17,212,0.05)]">
+                    <FolderOpen size={15} className="text-[#1111d4]" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold text-text-1">
@@ -224,5 +222,6 @@ export default function ProjectsPage() {
         )}
       </main>
     </div>
+    </PageShell>
   );
 }

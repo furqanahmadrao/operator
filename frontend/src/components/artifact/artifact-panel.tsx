@@ -43,65 +43,65 @@ export function ArtifactPanel({ artifact, streamingArtifact, onClose }: Artifact
 
   return (
     <div className="artifact-panel">
-      {/* Header */}
-      <div className="artifact-panel-header">
+      {/* ── Toolbar ────────────────────────────────────────────────────────── */}
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-bg px-0">
 
-        {/* LEFT: Preview / Code toggle */}
-        <div className="flex shrink-0 items-center gap-1">
-          <div className="artifact-panel-toggle" role="group" aria-label="View mode">
-            <button
-              type="button"
-              onClick={() => setViewMode("preview")}
-              className={`artifact-panel-toggle-btn ${
-                viewMode === "preview" ? "artifact-panel-toggle-btn-active" : ""
-              }`}
-              aria-pressed={viewMode === "preview"}
-              title="Preview"
-            >
-              <Eye size={13} />
-              <span>Preview</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("code")}
-              className={`artifact-panel-toggle-btn ${
-                viewMode === "code" ? "artifact-panel-toggle-btn-active" : ""
-              }`}
-              aria-pressed={viewMode === "code"}
-              title="Code"
-            >
-              <Code2 size={13} />
-              <span>Code</span>
-            </button>
-          </div>
+        {/* LEFT: Tab buttons (border-b-2 underline style) */}
+        <div className="flex h-full items-stretch">
+          <button
+            type="button"
+            onClick={() => setViewMode("preview")}
+            className={`flex h-full items-center gap-1.5 px-4 text-xs font-bold uppercase tracking-wide transition-colors hover:bg-black/5 ${
+              viewMode === "preview"
+                ? "border-b-2 border-accent text-accent"
+                : "border-b-2 border-transparent text-text-3 hover:text-text-1"
+            }`}
+            aria-pressed={viewMode === "preview"}
+          >
+            <Eye size={12} />
+            Preview
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("code")}
+            className={`flex h-full items-center gap-1.5 px-4 text-xs font-bold uppercase tracking-wide transition-colors hover:bg-black/5 ${
+              viewMode === "code"
+                ? "border-b-2 border-accent text-accent"
+                : "border-b-2 border-transparent text-text-3 hover:text-text-1"
+            }`}
+            aria-pressed={viewMode === "code"}
+          >
+            <Code2 size={12} />
+            Code
+          </button>
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* RIGHT: Writing indicator (streaming) or Copy + Download + Close */}
-        <div className="flex shrink-0 items-center gap-1">
+        {/* RIGHT: Writing indicator / Copy / Download / Close */}
+        <div className="flex shrink-0 items-center gap-1 pr-3">
           {isStreaming ? (
-            <div className="flex items-center gap-1.5 px-1">
+            <div className="flex items-center gap-1.5 px-2">
               <span className="thinking-dots">
                 <span />
                 <span />
                 <span />
               </span>
-              <span className="text-[11px] text-text-3">Writing…</span>
+              <span className="text-[10px] font-mono uppercase tracking-widest text-text-3">Writing…</span>
             </div>
           ) : (
             <>
+              {/* Version badge */}
+              {artifact && artifact.version > 1 && (
+                <span className="mr-1 text-[10px] font-mono text-text-3 opacity-50">v{artifact.version}</span>
+              )}
               <button
                 type="button"
                 onClick={handleCopy}
                 disabled={!displayArtifact}
-                className="artifact-panel-action-btn"
+                className="flex items-center gap-1.5 border border-border bg-bg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-text-2 transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label={copied ? "Copied!" : "Copy content"}
-                title={copied ? "Copied!" : "Copy"}
               >
-                {copied ? <Check size={13} /> : <Copy size={13} />}
-                <span>{copied ? "Copied!" : "Copy"}</span>
+                {copied ? <Check size={11} /> : <Copy size={11} />}
+                {copied ? "Copied!" : "Copy"}
               </button>
               <DownloadMenu
                 variant="icon"
@@ -115,54 +115,58 @@ export function ArtifactPanel({ artifact, streamingArtifact, onClose }: Artifact
           <button
             type="button"
             onClick={onClose}
-            className="artifact-action-btn"
+            className="flex h-7 w-7 items-center justify-center text-text-3 transition-colors hover:bg-surface-3 hover:text-text-1"
             aria-label="Close artifact panel"
-            title="Close"
           >
-            <X size={13} />
+            <X size={14} />
           </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="artifact-panel-body">
+      {/* ── Canvas / Viewport ──────────────────────────────────────────────── */}
+      <div className="min-h-0 flex-1 overflow-auto bg-bg">
         {displayArtifact ? (
-          viewMode === "preview" ? (
-            displayArtifact.type.toLowerCase() === "html" ? (
-              /* ── HTML: live sandboxed iframe ── */
-              <iframe
-                key={displayArtifact.id || "streaming"}
-                srcDoc={displayArtifact.content}
-                sandbox="allow-scripts allow-modals allow-forms allow-popups"
-                className="artifact-panel-iframe"
-                title={displayArtifact.title}
-              />
-            ) : (
-              /* ── Markdown: rendered prose ── */
-              <div className="markdown-content">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    pre: ({ children }) => <>{children}</>,
-                    code: CodeBlock,
-                    a: ({ ...props }) => (
-                      <a {...props} target="_blank" rel="noopener noreferrer" />
-                    ),
-                  }}
-                >
-                  {displayArtifact.content}
-                </ReactMarkdown>
-              </div>
-            )
-          ) : (
-            /* Raw source view (both types) */
-            <pre className="artifact-panel-raw">
-              <code>{displayArtifact.content}</code>
-            </pre>
-          )
+          <div className="flex h-full min-h-[400px] w-full flex-col bg-surface-1">
+            {/* Content area — no browser chrome, content fills directly */}
+            <div className="min-h-0 flex-1 overflow-auto">
+              {viewMode === "preview" ? (
+                displayArtifact.type.toLowerCase() === "html" ? (
+                  /* HTML: live sandboxed iframe */
+                  <iframe
+                    key={`${displayArtifact.id || "streaming"}-${displayArtifact.updated_at || ""}`}
+                    srcDoc={displayArtifact.content}
+                    sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                    className="artifact-panel-iframe"
+                    title={displayArtifact.title}
+                  />
+                ) : (
+                  /* Markdown: rendered prose */
+                  <div className="markdown-content p-6">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        pre: ({ children }) => <>{children}</>,
+                        code: CodeBlock,
+                        a: ({ ...props }) => (
+                          <a {...props} target="_blank" rel="noopener noreferrer" />
+                        ),
+                      }}
+                    >
+                      {displayArtifact.content}
+                    </ReactMarkdown>
+                  </div>
+                )
+              ) : (
+                /* Raw source */
+                <pre className="artifact-panel-raw p-4">
+                  <code>{displayArtifact.content}</code>
+                </pre>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="flex h-full items-center justify-center">
-            <p className="text-[13px] text-text-3">No artifact selected</p>
+            <p className="text-[12px] font-mono uppercase tracking-widest text-text-3">No_Artifact_Selected</p>
           </div>
         )}
       </div>

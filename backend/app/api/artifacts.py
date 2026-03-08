@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from app.api.schemas import ArtifactSchema, ArtifactUpdate, ArtifactWithSessionSchema
+from app.api.schemas import ArtifactRevisionSchema, ArtifactSchema, ArtifactUpdate, ArtifactWithSessionSchema
 from app.services import artifact_service
 
 router = APIRouter()
@@ -34,6 +34,15 @@ async def update_artifact(artifact_id: str, body: ArtifactUpdate):
     if not artifact:
         raise HTTPException(status_code=404, detail="Artifact not found")
     return artifact
+
+
+@router.get("/artifacts/{artifact_id}/revisions", response_model=list[ArtifactRevisionSchema])
+async def list_revisions(artifact_id: str):
+    """Return all revisions for an artifact (oldest-first)."""
+    artifact = await artifact_service.get_artifact(artifact_id)
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return await artifact_service.list_artifact_revisions(artifact_id)
 
 
 @router.delete("/artifacts/{artifact_id}", status_code=204)

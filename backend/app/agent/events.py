@@ -8,7 +8,8 @@ Provides:
 
 Think-tag streaming
 -------------------
-Some models (DeepSeek-R1, future reasoning models) emit ``<think>...</think>``
+Some reasoning-capable models (historically DeepSeek-R1 and newer
+DeepSeek releases) emit ``<think>...</think>``
 blocks inline with their response.  ``TurnAccumulator.feed_chunk()`` parses
 these in real-time:
 
@@ -70,6 +71,10 @@ def sse_artifact_created(artifact: dict) -> str:
     return sse({"type": "artifact_created", "artifact": artifact})
 
 
+def sse_artifact_updated(artifact: dict) -> str:
+    return sse({"type": "artifact_updated", "artifact": artifact})
+
+
 def sse_message_ids(user_message_id: str, assistant_message_id: str) -> str:
     return sse(
         {
@@ -82,6 +87,41 @@ def sse_message_ids(user_message_id: str, assistant_message_id: str) -> str:
 
 def sse_error(message: str) -> str:
     return sse({"type": "error", "message": message})
+
+
+def sse_clarifying_questions(questions: list[dict]) -> str:
+    """Emit clarifying questions before a deep research run begins.
+
+    Each question dict: ``{"id": str, "text": str, "choices": list[str]}``.
+    """
+    return sse({"type": "clarifying_questions", "questions": questions})
+
+
+def sse_deep_research_plan(sub_questions: list[str], iteration: int) -> str:
+    """Emit the planned sub-questions for a deep research iteration."""
+    return sse(
+        {
+            "type": "deep_research_plan",
+            "sub_questions": sub_questions,
+            "iteration": iteration,
+        }
+    )
+
+
+def sse_deep_research_progress(step: str) -> str:
+    """Emit a deep research progress step.
+
+    step values: ``"evaluating"`` | ``"synthesizing"`` | ``"writing"``
+    """
+    return sse({"type": "deep_research_progress", "step": step})
+
+
+def sse_todo_update(items: list[dict]) -> str:
+    """Emit a todo/task-list update during a deep research run.
+
+    Each item: ``{"id": str, "text": str, "status": "pending"|"active"|"done"}``
+    """
+    return sse({"type": "todo_update", "items": items})
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +154,7 @@ class TurnAccumulator:
     thinking_buffer: str = ""
     search_events: list[dict] = field(default_factory=list)
     created_artifact_ids: list[str] = field(default_factory=list)
+    updated_artifact_ids: list[str] = field(default_factory=list)
 
     # Internal streaming think-tag state (excluded from repr / __init__)
     _in_thinking: bool = field(default=False, init=False, repr=False)

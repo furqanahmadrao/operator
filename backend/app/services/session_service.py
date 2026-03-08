@@ -191,6 +191,16 @@ async def update_message_artifact(message_id: str, artifact_id: str) -> None:
         await db.commit()
 
 
+async def update_message_content(message_id: str, content: str) -> None:
+    """Update the content of an already-persisted message (e.g. after deep research)."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE messages SET content = ? WHERE id = ?",
+            (content, message_id),
+        )
+        await db.commit()
+
+
 # ---------------------------------------------------------------------------
 # Session helpers
 # ---------------------------------------------------------------------------
