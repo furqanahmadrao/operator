@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   Calendar,
@@ -32,6 +32,8 @@ interface ToolBlockProps {
   children?: React.ReactNode;
   /** Start expanded? Default: false (collapsed) */
   defaultExpanded?: boolean;
+  /** Callback when user toggles expansion */
+  onToggle?: () => void;
 }
 
 export function ToolBlock({
@@ -42,9 +44,22 @@ export function ToolBlock({
   subtitle,
   children,
   defaultExpanded = false,
+  onToggle,
 }: ToolBlockProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const isExpandable = status === "completed" && !!children;
+  // Allow expansion for running status if children exist (for thinking block live streaming)
+  const isExpandable = (status === "completed" || status === "running") && !!children;
+
+  // Sync internal state with defaultExpanded prop changes
+  useEffect(() => {
+    setExpanded(defaultExpanded);
+  }, [defaultExpanded]);
+
+  const handleClick = () => {
+    const newState = !expanded;
+    setExpanded(newState);
+    onToggle?.();
+  };
 
   const headerContent = (
     <>
@@ -88,7 +103,7 @@ export function ToolBlock({
         <button
           type="button"
           className="tb-header tb-header-clickable"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={handleClick}
           aria-expanded={expanded}
         >
           {headerContent}
@@ -121,6 +136,30 @@ export function DateCheckBlock({ date, time }: DateCheckBlockProps) {
       icon={<Calendar size={11} />}
       title={`Today is ${date}`}
       badge={time}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DEEP RESEARCH PROGRESS BLOCK
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DeepResearchBlockProps {
+  step: "evaluating" | "synthesizing" | "writing";
+}
+
+export function DeepResearchBlock({ step }: DeepResearchBlockProps) {
+  const stepLabels = {
+    evaluating: "Evaluating coverage",
+    synthesizing: "Synthesizing findings",
+    writing: "Writing report",
+  };
+
+  return (
+    <ToolBlock
+      status="running"
+      icon={<Globe size={11} />}
+      title={stepLabels[step] || "Processing"}
     />
   );
 }

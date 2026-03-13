@@ -36,7 +36,7 @@ from typing import Annotated, Any, TypedDict
 
 import operator
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+from app.services.llm import make_chat_llm
 from langgraph.graph import END, StateGraph
 
 from app.agent.events import (
@@ -82,13 +82,13 @@ class DeepResearchState(TypedDict):
 # ---------------------------------------------------------------------------
 
 
-def _make_research_llm() -> ChatOpenAI:
+def _make_research_llm():
     """Fast, capable model for research reasoning (not the slow R1 variant)."""
-    return ChatOpenAI(
-        model=settings.nvidia_model,
-        api_key=settings.nvidia_api_key,          # type: ignore[arg-type]
-        base_url=settings.nvidia_base_url,
-        max_tokens=settings.nvidia_max_tokens,
+    # Use the central LLM factory but disable streaming for research calls.
+    # Model and token limit come from provider-agnostic settings.
+    return make_chat_llm(
+        model=settings.chat_model,
+        max_tokens=settings.chat_max_tokens,
         temperature=0.3,
         streaming=False,
     )
@@ -190,7 +190,7 @@ async def plan_research(state: DeepResearchState) -> dict[str, Any]:
 
 
 async def run_searches(state: DeepResearchState) -> dict[str, Any]:
-    """Run parallel Google CSE searches; emit live todo + source SSE events."""
+    """Run sequential Google CSE searches; emit live todo + source SSE events."""
     # Initialise a mutable snapshot of todo states for this batch
     todos: list[dict[str, str]] = [
         {"id": f"s{i}", "text": q, "status": "pending"}
@@ -226,8 +226,11 @@ async def run_searches(state: DeepResearchState) -> dict[str, Any]:
             log.warning("Deep research search failed for %r: %s", q, exc)
             return {"query": q, "results": [], "result_count": 0, "error": str(exc)}
 
-    tasks = [_search_one(i, q) for i, q in enumerate(state["sub_questions"])]
-    batch_results: list[dict[str, Any]] = list(await asyncio.gather(*tasks))
+    # Execute searches sequentially (one at a time) instead of in parallel
+    batch_results: list[dict[str, Any]] = []
+    for i, q in enumerate(state["sub_questions"]):
+        result = await _search_one(i, q)
+        batch_results.append(result)
 
     return {"search_results": batch_results}   # operator.add accumulates across iterations
 

@@ -86,6 +86,201 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## 4) Docker Setup (Alternative)
+
+For a simplified single-container deployment:
+
+### Quick Start
+
+1. **Configure environment:**
+   ```bash
+   cp backend/.env.example backend/.env
+   # Edit backend/.env and set your API keys
+   ```
+
+2. **Run with script:**
+   ```bash
+   # Linux/Mac
+   chmod +x run-docker.sh
+   ./run-docker.sh
+   
+   # Windows
+   run-docker.bat
+   ```
+
+3. **Access application:**
+   - **Frontend (Web UI)**: http://localhost:3000
+   - **API**: http://localhost:8000
+   - **Health**: http://localhost:8000/health
+
+### Manual Docker Commands
+
+```bash
+# Build and run
+docker build -t agentic-runtime .
+docker run -d \
+  --name agentic-runtime \
+  -p 3000:3000 \
+  -p 8000:8000 \
+  -v $(pwd)/workspace:/workspace \
+  -v $(pwd)/backend/data:/app/backend/data \
+  --env-file backend/.env \
+  --restart unless-stopped \
+  agentic-runtime
+```
+
+The Docker container builds both frontend and backend into a single container, using the same environment configuration as local development.
+
+## Resource Limits
+
+The agent runtime includes comprehensive resource monitoring and enforcement to ensure stable operation and prevent resource exhaustion.
+
+### Available Resource Limits
+
+The system monitors and enforces limits on the following resources:
+
+| Resource Type | Default Limit | Environment Variable | Description |
+|---------------|---------------|---------------------|-------------|
+| **Memory** | 2 GB | `MEMORY_LIMIT_GB` | Maximum memory usage for monitoring |
+| **CPU** | 2 cores | `CPU_LIMIT_CORES` | CPU limit in cores for monitoring |
+| **Concurrent Commands** | 3 | `MAX_CONCURRENT_COMMANDS` | Maximum simultaneous terminal commands |
+| **Browser Sessions** | 5 | `MAX_CONCURRENT_BROWSER_SESSIONS` | Maximum concurrent browser automation sessions |
+| **Workspace Size** | 10 GB | `MAX_WORKSPACE_SIZE_GB` | Maximum workspace disk usage |
+
+### Configuration
+
+Resource limits are configured via environment variables in your `.env` file:
+
+```env
+# Resource Limits
+MEMORY_LIMIT_GB=2
+CPU_LIMIT_CORES=2
+MAX_CONCURRENT_COMMANDS=3
+MAX_CONCURRENT_BROWSER_SESSIONS=5
+MAX_WORKSPACE_SIZE_GB=10
+```
+
+### Warning Thresholds
+
+The system emits warning events when resource usage approaches limits:
+
+- **Memory**: Warning at 80% of limit
+- **CPU**: Warning at 80% of limit  
+- **Workspace**: Warning at 90% of limit
+
+### Enforcement Behavior
+
+**Hard Limits (Blocking):**
+- **Concurrent Commands**: New command execution is blocked when limit reached
+- **Browser Sessions**: New browser session creation is blocked when limit reached
+
+**Soft Limits (Monitoring Only):**
+- **Memory**: Monitored and warnings emitted, but not enforced
+- **CPU**: Monitored and warnings emitted, but not enforced
+- **Workspace Size**: Monitored and warnings emitted, but not enforced
+
+### Warning Events
+
+When resource usage approaches limits, the system:
+
+1. Logs warnings to the application log
+2. Emits warning events via the activity stream (visible in UI)
+3. Provides specific resource usage details and recommendations
+
+Example warning event:
+```json
+{
+  "event_type": "warning",
+  "warning_type": "memory_limit",
+  "message": "Memory usage at 85.2% of limit",
+  "current_mb": 1740.8,
+  "limit_mb": 2048,
+  "threshold_percent": 80
+}
+```
+
+### Configuration Examples
+
+**Development Environment (Relaxed Limits):**
+```env
+MEMORY_LIMIT_GB=4
+CPU_LIMIT_CORES=4
+MAX_CONCURRENT_COMMANDS=5
+MAX_CONCURRENT_BROWSER_SESSIONS=3
+MAX_WORKSPACE_SIZE_GB=20
+```
+
+**Production Environment (Strict Limits):**
+```env
+MEMORY_LIMIT_GB=1
+CPU_LIMIT_CORES=1
+MAX_CONCURRENT_COMMANDS=2
+MAX_CONCURRENT_BROWSER_SESSIONS=2
+MAX_WORKSPACE_SIZE_GB=5
+```
+
+**Docker Deployment:**
+```bash
+docker run \
+  -p 8000:8000 \
+  -v $(pwd)/workspace:/workspace \
+  -e MEMORY_LIMIT_GB=2 \
+  -e CPU_LIMIT_CORES=2 \
+  -e MAX_CONCURRENT_COMMANDS=3 \
+  -e MAX_CONCURRENT_BROWSER_SESSIONS=5 \
+  -e MAX_WORKSPACE_SIZE_GB=10 \
+  agent-runtime
+```
+
+### Monitoring Resource Usage
+
+Check current resource usage via the health endpoint:
+
+```bash
+curl http://localhost:8000/health
+```
+
+The response includes current resource usage and limit information:
+
+```json
+{
+  "status": "healthy",
+  "resource_usage": {
+    "memory_mb": 512.3,
+    "memory_percent": 25.1,
+    "cpu_percent": 15.2,
+    "workspace_size_mb": 1024.5,
+    "active_commands": 1,
+    "active_browser_sessions": 2
+  },
+  "resource_limits": {
+    "memory_limit_gb": 2.0,
+    "cpu_limit_cores": 2.0,
+    "max_concurrent_commands": 3,
+    "max_concurrent_browser_sessions": 5,
+    "max_workspace_size_gb": 10.0
+  }
+}
+```
+
+### Troubleshooting
+
+**Command Execution Blocked:**
+- Check active command count: `curl http://localhost:8000/health`
+- Wait for existing commands to complete
+- Increase `MAX_CONCURRENT_COMMANDS` if needed
+
+**Browser Session Creation Failed:**
+- Check active browser sessions: `curl http://localhost:8000/health`
+- Close unused browser sessions
+- Increase `MAX_CONCURRENT_BROWSER_SESSIONS` if needed
+
+**High Resource Usage Warnings:**
+- Monitor resource usage trends via health endpoint
+- Consider increasing limits for your use case
+- Clean up workspace files if disk usage is high
+- Restart the service to reset memory usage
+
 ## What V1 Includes
 
 - Premium dark chat landing shell

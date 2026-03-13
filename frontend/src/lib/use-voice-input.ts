@@ -40,36 +40,37 @@ export function useVoiceInput({
   lang,
 }: UseVoiceInputOptions): UseVoiceInputReturn {
   const [state, setState] = useState<VoiceInputState>("idle");
-  // Start as false — matches the server render (no window).
-  // Flip to true in a useEffect so both passes agree on the first paint.
-  const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const onTranscriptRef = useRef(onTranscript);
+  
+  // Compute browser support lazily (avoids hydration mismatch)
+  const [isSupported] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      typeof window.SpeechRecognition !== "undefined" ||
+      typeof window.webkitSpeechRecognition !== "undefined"
+    );
+  });
 
   // Keep ref up-to-date so the recognition callbacks always use the latest fn
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
-  // Detect browser support after mount (client-only)
-  useEffect(() => {
-    setIsSupported(
-      typeof window.SpeechRecognition !== "undefined" ||
-      typeof window.webkitSpeechRecognition !== "undefined",
-    );
-  }, []);
-
   const startListening = useCallback(() => {
-    if (!isSupported) return;
+    // Check browser support directly instead of relying on state
+    const SpeechRecognitionCtor =
+      window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognitionCtor) return;
 
     // Stop any in-flight session first
     recognitionRef.current?.stop();
 
-    const SpeechRecognitionCtor =
-      window.SpeechRecognition ?? window.webkitSpeechRecognition!;
     const recognition = new SpeechRecognitionCtor();
 
-    recognition.continuous = false;
+    // Enable continuous listening - keeps recording until manually stopped
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     if (lang) recognition.lang = lang;
@@ -108,7 +109,7 @@ export function useVoiceInput({
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [isSupported, lang]);
+  }, [lang]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();

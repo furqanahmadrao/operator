@@ -68,13 +68,14 @@ export type SearchResultsPayload = {
  */
 export type WebSearchEvent = {
   type: "web_search";
-  status: "completed" | "error";
+  status: "completed" | "error" | "running";
   query: string;
   result_count: number;
   results: SearchResultItem[];
   search_id: string;
   timestamp: string;
   message?: string;
+  toolId?: string; // ID for matching with sentinel markers
 };
 
 /**
@@ -85,13 +86,119 @@ export type DateCheckEvent = {
   date: string;
   time: string;
   timestamp: string;
+  toolId?: string; // ID for matching with sentinel markers
+};
+
+/**
+ * A persisted generic tool start event embedded in a ChatMessage.
+ */
+export type ToolStartEvent = {
+  type: "tool_start";
+  tool_name: string;
+  parameters?: Record<string, unknown>;
+  timestamp: string;
+  toolId?: string; // ID for matching with sentinel markers
+  correlation_id?: string;
+};
+
+/**
+ * A persisted generic tool end event embedded in a ChatMessage.
+ */
+export type ToolEndEvent = {
+  type: "tool_end";
+  tool_name: string;
+  result_summary?: string;
+  status: "success" | "failed";
+  error?: string;
+  duration_ms: number;
+  timestamp: string;
+  toolId?: string; // ID for matching with sentinel markers
+  correlation_id?: string;
 };
 
 /**
  * A persisted tool event embedded in a ChatMessage after streaming completes
  * (and restored from metadata_json when a session is loaded).
  */
-export type ToolEvent = WebSearchEvent | DateCheckEvent;
+export type ToolEvent = WebSearchEvent | DateCheckEvent | ToolStartEvent | ToolEndEvent;
+
+// ── Terminal types ────────────────────────────────────────────────────────────
+
+export type TerminalOutputEvent = {
+  type: "terminal_output";
+  content: string;
+  stream_type: "stdout" | "stderr";
+  command_context?: string;
+  working_directory: string;
+  timestamp: string;
+  session_id: string;
+  correlation_id?: string;
+};
+
+export type TerminalCompleteEvent = {
+  type: "terminal_complete";
+  exit_code: number;
+  command: string;
+  duration_ms: number;
+  timestamp: string;
+  session_id: string;
+  correlation_id?: string;
+};
+
+// ── Browser types ─────────────────────────────────────────────────────────────
+
+export type BrowserNavigateEvent = {
+  type: "browser_navigate";
+  url: string;
+  session_name: string;
+  status: "started" | "completed" | "failed";
+  error?: string;
+  timestamp: string;
+  session_id: string;
+  correlation_id?: string;
+};
+
+export type BrowserClickEvent = {
+  type: "browser_click";
+  selector: string;
+  session_name: string;
+  status: "started" | "completed" | "failed";
+  error?: string;
+  timestamp: string;
+  session_id: string;
+  correlation_id?: string;
+};
+
+export type BrowserScreenshotEvent = {
+  type: "browser_screenshot";
+  filename: string;
+  session_name: string;
+  status: "started" | "completed" | "failed";
+  error?: string;
+  timestamp: string;
+  session_id: string;
+  correlation_id?: string;
+};
+
+// ── Planning and Reflection types ─────────────────────────────────────────────
+
+export type PlanningEvent = {
+  type: "planning";
+  sub_tasks: string[];
+  reasoning: string;
+  timestamp: string;
+  session_id: string;
+  correlation_id?: string;
+};
+
+export type ReflectionEvent = {
+  type: "reflection";
+  observation: string;
+  adjustment?: string;
+  timestamp: string;
+  session_id: string;
+  correlation_id?: string;
+};
 
 // ── Deep research types ───────────────────────────────────────────────────────
 
@@ -125,7 +232,16 @@ type SessionStreamEvent =
   | { type: "clarifying_questions"; questions: ClarifyingQuestion[] }
   | { type: "deep_research_plan"; sub_questions: string[]; iteration: number }
   | { type: "deep_research_progress"; step: string }
-  | { type: "todo_update"; items: TodoItem[] };
+  | { type: "todo_update"; items: TodoItem[] }
+  | TerminalOutputEvent
+  | TerminalCompleteEvent
+  | BrowserNavigateEvent
+  | BrowserClickEvent
+  | BrowserScreenshotEvent
+  | PlanningEvent
+  | ReflectionEvent
+  | ({ type: "tool_start" } & Omit<ToolStartEvent, "type">)
+  | ({ type: "tool_end" } & Omit<ToolEndEvent, "type">);
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
@@ -221,7 +337,17 @@ export async function streamSessionChat(
   onDeepResearchPlan?: (subQuestions: string[], iteration: number) => void,
   onDeepResearchProgress?: (step: string) => void,
   onTodoUpdate?: (items: TodoItem[]) => void,
+  onTerminalOutput?: (event: TerminalOutputEvent) => void,
+  onTerminalComplete?: (event: TerminalCompleteEvent) => void,
+  onBrowserNavigate?: (event: BrowserNavigateEvent) => void,
+  onBrowserClick?: (event: BrowserClickEvent) => void,
+  onBrowserScreenshot?: (event: BrowserScreenshotEvent) => void,
+  onToolStart?: (event: ToolStartEvent) => void,
+  onToolEnd?: (event: ToolEndEvent) => void,
+  onPlanning?: (event: PlanningEvent) => void,
+  onReflection?: (event: ReflectionEvent) => void,
 ): Promise<void> {
+  console.log("[SSE] Starting stream for session:", sessionId);
   const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -271,10 +397,12 @@ export async function streamSessionChat(
       try {
         parsed = JSON.parse(data) as SessionStreamEvent;
       } catch {
+        console.warn("[SSE] Failed to parse event:", data);
         continue;
       }
 
       if (parsed.type === "token") {
+        console.log("[SSE] Token received:", parsed.content.substring(0, 50));
         onToken(parsed.content);
       } else if (parsed.type === "thinking") {
         onThinking?.(parsed.content);
@@ -323,6 +451,24 @@ export async function streamSessionChat(
         onDeepResearchProgress?.(parsed.step);
       } else if (parsed.type === "todo_update") {
         onTodoUpdate?.(parsed.items);
+      } else if (parsed.type === "terminal_output") {
+        onTerminalOutput?.(parsed as TerminalOutputEvent);
+      } else if (parsed.type === "terminal_complete") {
+        onTerminalComplete?.(parsed as TerminalCompleteEvent);
+      } else if (parsed.type === "browser_navigate") {
+        onBrowserNavigate?.(parsed as BrowserNavigateEvent);
+      } else if (parsed.type === "browser_click") {
+        onBrowserClick?.(parsed as BrowserClickEvent);
+      } else if (parsed.type === "browser_screenshot") {
+        onBrowserScreenshot?.(parsed as BrowserScreenshotEvent);
+      } else if (parsed.type === "tool_start") {
+        onToolStart?.(parsed as ToolStartEvent);
+      } else if (parsed.type === "tool_end") {
+        onToolEnd?.(parsed as ToolEndEvent);
+      } else if (parsed.type === "planning") {
+        onPlanning?.(parsed as PlanningEvent);
+      } else if (parsed.type === "reflection") {
+        onReflection?.(parsed as ReflectionEvent);
       }
       // message_ids: stored server-side, not needed client-side yet
     }

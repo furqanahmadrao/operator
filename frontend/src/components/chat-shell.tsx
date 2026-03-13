@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowUp, Check, ChevronLeft, ChevronRight, Copy, Edit3, Files, FolderOpen, Image as ImageIcon, Mic, Paperclip, Pencil, Square, X } from "lucide-react";
+import { ArrowUp, Check, ChevronLeft, ChevronRight, Copy, Edit3, Files, FolderOpen, Image as ImageIcon, Mic, Paperclip, Pencil, Square, Terminal, X } from "lucide-react";
 import { LeftRail } from "@/components/shell/left-rail";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,14 +20,18 @@ import remarkGfm from "remark-gfm";
 import { ChatErrorBanner } from "@/components/chat/chat-error-banner";
 import { ChatLoadingSkeleton } from "@/components/chat/chat-loading-skeleton";
 import { CodeBlock } from "@/components/chat/code-block";
-import { WebSearchBlock } from "@/components/chat/tool-activity";
+import { WebSearchBlock, DeepResearchBlock } from "@/components/chat/tool-activity";
 import { ThinkingBlock } from "@/components/chat/thinking-block";
+import { ToolCard } from "@/components/tool-card/ToolCard";
 import ClarifyingQuestionsBar from "@/components/chat/clarifying-questions-bar";
 import { TodoWidget } from "@/components/chat/todo-widget";
 import { SessionSidebar } from "@/components/shell/session-sidebar";
 import { FilesPanel } from "@/components/shell/files-panel";
 import { ArtifactPanel } from "@/components/artifact/artifact-panel";
 import { ArtifactCard, StreamingArtifactCard } from "@/components/artifact/artifact-card";
+import { RightSidebar, useRightSidebar, type RightSidebarTab } from "@/components/sidebar/RightSidebar";
+import { Terminal as TerminalComponent, type TerminalLine } from "@/components/terminal/Terminal";
+import { BrowserPreview } from "@/components/browser/BrowserPreview";
 import type {
   ChatMessage,
   ClarifyingQuestion,
@@ -36,8 +40,18 @@ import type {
   SearchResultsPayload,
   ToolEvent,
   SearchResultItem,
+  ToolStartEvent,
+  ToolEndEvent,
+  TerminalOutputEvent,
+  TerminalCompleteEvent,
+  BrowserNavigateEvent,
+  BrowserClickEvent,
+  BrowserScreenshotEvent,
+  PlanningEvent,
+  ReflectionEvent,
 } from "@/lib/chat-api";
 import { streamSessionChat } from "@/lib/chat-api";
+import { useToolCards } from "@/lib/use-tool-cards";
 import type { Session } from "@/lib/sessions-api";
 import {
   createSession,
@@ -71,11 +85,41 @@ const ARTIFACT_BLOCK_RE =
 const ARTIFACT_OPEN_RE = /<artifact\b/;
 
 function stripArtifactBlock(content: string): string {
-  return content.replace(ARTIFACT_BLOCK_RE, "").replace(/\x00/g, "").trim();
+  // Strip both artifact blocks and tool sentinels
+  return content
+    .replace(ARTIFACT_BLOCK_RE, "")
+    .replace(/\x00/g, "")
+    .replace(TOOL_SENTINEL_RE, "")
+    .trim();
 }
 
 /** Sentinel placed at the artifact's position so the card renders inline. */
 const ARTIFACT_SENTINEL = "\x00";
+
+/** Sentinel prefix for tool events - format: \x01TOOL:{tool_type}:{tool_id}\x01 */
+const TOOL_SENTINEL_PREFIX = "\x01TOOL:";
+const TOOL_SENTINEL_SUFFIX = "\x01";
+
+/**
+ * Creates a tool sentinel marker for inline positioning
+ */
+function createToolSentinel(toolType: string, toolId: string): string {
+  return `${TOOL_SENTINEL_PREFIX}${toolType}:${toolId}${TOOL_SENTINEL_SUFFIX}`;
+}
+
+/**
+ * Regex to match tool sentinels in content
+ * Matches both control character format (\x01) and Unicode bracket format (【】)
+ */
+const TOOL_SENTINEL_RE = /(?:\x01TOOL:([^:]+):([^\x01]+)\x01|【TOOL:([^:]+):([^】]+)】)/g;
+
+/**
+ * Strips tool sentinel markers from content for display/storage
+ * Handles both \x01 control characters and 【】 Unicode brackets
+ */
+function stripToolSentinels(content: string): string {
+  return content.replace(TOOL_SENTINEL_RE, "");
+}
 
 /**
  * Replaces a completed <artifact>…</artifact> block with the sentinel,
@@ -117,6 +161,62 @@ function splitAroundArtifact(content: string): [string, string] {
   return [content.trim(), ""];
 }
 
+/**
+ * Parses message content and splits it into segments around tool sentinels.
+ * Returns an array of segments where each segment is either:
+ * - { type: "text", content: string } - regular text content
+ * - { type: "tool", toolType: string, toolId: string } - tool event marker
+ */
+function parseMessageWithToolEvents(
+  content: string
+): Array<
+  | { type: "text"; content: string }
+  | { type: "tool"; toolType: string; toolId: string }
+> {
+  const segments: Array<
+    | { type: "text"; content: string }
+    | { type: "tool"; toolType: string; toolId: string }
+  > = [];
+  
+  let lastIndex = 0;
+  const regex = new RegExp(TOOL_SENTINEL_RE);
+  let match: RegExpExecArray | null;
+  
+  while ((match = regex.exec(content)) !== null) {
+    // Add text before the sentinel
+    if (match.index > lastIndex) {
+      const textContent = content.substring(lastIndex, match.index);
+      if (textContent) {
+        segments.push({ type: "text", content: textContent });
+      }
+    }
+    
+    // Add tool marker - handle both formats
+    // Format 1: \x01TOOL:type:id\x01 -> match[1] and match[2]
+    // Format 2: 【TOOL:type:id】 -> match[3] and match[4]
+    const toolType = match[1] || match[3];
+    const toolId = match[2] || match[4];
+    segments.push({ type: "tool", toolType, toolId });
+    
+    lastIndex = regex.lastIndex;
+  }
+  
+  // Add remaining text after last sentinel
+  if (lastIndex < content.length) {
+    const textContent = content.substring(lastIndex);
+    if (textContent) {
+      segments.push({ type: "text", content: textContent });
+    }
+  }
+  
+  // If no sentinels found, return the whole content as text
+  if (segments.length === 0) {
+    segments.push({ type: "text", content });
+  }
+  
+  return segments;
+}
+
 /** Strips both complete and in-progress (unclosed) artifact blocks. */
 function stripPartialArtifactBlock(content: string): string {
   // First remove any fully completed blocks
@@ -126,6 +226,8 @@ function stripPartialArtifactBlock(content: string): string {
   if (idx !== -1) {
     result = result.substring(0, idx).trim();
   }
+  // Also strip tool sentinels
+  result = result.replace(TOOL_SENTINEL_RE, "");
   return result;
 }
 
@@ -253,6 +355,9 @@ export function ChatShell() {
   const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
   const [todoCollapsed, setTodoCollapsed] = useState(false);
 
+  // ── Deep research progress state ──────────────────────────────────────────
+  const [deepResearchStep, setDeepResearchStep] = useState<string | null>(null);
+
   // ── Web search tool state ─────────────────────────────────────────────────
   const [activeToolActivity, setActiveToolActivity] =
     useState<ToolActivityPayload | null>(null);
@@ -263,6 +368,26 @@ export function ChatShell() {
   const lastTokenTimeRef = useRef<number>(0);
   /** Date/time from the most recent date_check tool event (shown live during streaming) */
   const [pendingDateCheck, setPendingDateCheck] = useState<{ date: string; time: string } | null>(null);
+
+  // ── Tool cards state ──────────────────────────────────────────────────────
+  const {
+    activeTools,
+    handleToolStart,
+    handleToolEnd,
+    clearAllTools,
+  } = useToolCards();
+
+  // ── Right sidebar state ───────────────────────────────────────────────────
+  const rightSidebar = useRightSidebar();
+  
+  // ── Terminal state ────────────────────────────────────────────────────────
+  const [terminalOutput, setTerminalOutput] = useState<TerminalLine[]>([]);
+  const [currentCommand, setCurrentCommand] = useState<string>("");
+  
+  // ── Browser state ─────────────────────────────────────────────────────────
+  const [browserUrl, setBrowserUrl] = useState<string>("");
+  const [browserScreenshot, setBrowserScreenshot] = useState<string | null>(null);
+  const [browserStatus, setBrowserStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
 
   // ── Streaming artifact state (live preview while artifact streams) ─────────
   const [streamingArtifact, setStreamingArtifact] = useState<{
@@ -520,17 +645,18 @@ export function ChatShell() {
 
   // ── Close panels on Escape ────────────────────────────────────────────────
   useEffect(() => {
-    if (!isSidebarOpen && !isFilesPanelOpen && !isArtifactPanelOpen) return;
+    if (!isSidebarOpen && !isFilesPanelOpen && !isArtifactPanelOpen && !rightSidebar.isOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsSidebarOpen(false);
         setIsFilesPanelOpen(false);
+        rightSidebar.closeSidebar();
         // Don't close artifact panel on Escape — user can click X
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [isSidebarOpen, isFilesPanelOpen, isArtifactPanelOpen]);
+  }, [isSidebarOpen, isFilesPanelOpen, isArtifactPanelOpen, rightSidebar]);
 
   // ── Track streaming artifact to give live preview in the panel ───────────
   useEffect(() => {
@@ -719,6 +845,7 @@ export function ChatShell() {
         pendingToolEventsRef.current = [];
         setActiveToolActivity(null);
         setActiveSearchResults(null);
+        setDeepResearchStep(null);
 
         await streamSessionChat(
           sessionId,
@@ -748,13 +875,34 @@ export function ChatShell() {
             }
             void refreshSessions();
           },
-          // onArtifactUpdated — not handled in this view (artifacts are loaded fresh)
-          undefined,
-          // onToolActivity — update live status row
+          // onArtifactUpdated — handle artifact updates during streaming
+          (artifact) => {
+            // Update the artifact in the artifacts list
+            setArtifacts((prev) =>
+              prev.map((a) => (a.id === artifact.id ? artifact : a)),
+            );
+            // If this artifact is currently selected, the panel will auto-update
+            // If the panel is closed, open it to show the update
+            if (selectedArtifactId === artifact.id || !isArtifactPanelOpen) {
+              setSelectedArtifactId(artifact.id);
+              if (!userClosedPanelRef.current) {
+                setIsArtifactPanelOpen(true);
+                setIsFilesPanelOpen(false);
+              }
+            }
+            void refreshSessions();
+          },
+          // onToolActivity — update live status row + inject sentinel
           (activity) => {
             if (activity.tool === "date_check") {
               // Show date check reactively + record as pending tool event
               setPendingDateCheck({ date: activity.date, time: activity.time });
+              const toolId = crypto.randomUUID();
+              
+              // Inject sentinel at current position
+              const sentinel = createToolSentinel("date_check", toolId);
+              appendAssistantToken(sentinel);
+              
               pendingToolEventsRef.current = [
                 ...pendingToolEventsRef.current.filter((e) => e.type !== "date_check"),
                 {
@@ -762,6 +910,7 @@ export function ChatShell() {
                   date: activity.date,
                   time: activity.time,
                   timestamp: new Date().toISOString(),
+                  toolId, // Store the ID for later matching
                 },
               ];
             } else {
@@ -769,7 +918,31 @@ export function ChatShell() {
               setActiveToolActivity(activity);
               if (activity.status === "running") {
                 setActiveSearchResults(null);
+                
+                // Inject sentinel at current position when search starts
+                const toolId = crypto.randomUUID();
+                const sentinel = createToolSentinel("web_search", toolId);
+                appendAssistantToken(sentinel);
+                
+                // Store the tool ID for later matching with results
+                pendingToolEventsRef.current = [
+                  ...pendingToolEventsRef.current,
+                  {
+                    type: "web_search" as const,
+                    status: "running" as const,
+                    query: activity.query,
+                    result_count: 0,
+                    results: [],
+                    search_id: toolId, // Use toolId as search_id for matching
+                    timestamp: new Date().toISOString(),
+                    toolId,
+                  },
+                ];
               } else if (activity.status === "error") {
+                const toolId = crypto.randomUUID();
+                const sentinel = createToolSentinel("web_search", toolId);
+                appendAssistantToken(sentinel);
+                
                 pendingToolEventsRef.current = [
                   ...pendingToolEventsRef.current,
                   {
@@ -778,9 +951,10 @@ export function ChatShell() {
                     query: activity.query,
                     result_count: 0,
                     results: [],
-                    search_id: crypto.randomUUID(),
+                    search_id: toolId,
                     timestamp: new Date().toISOString(),
                     message: activity.message,
+                    toolId,
                   },
                 ];
               }
@@ -790,8 +964,17 @@ export function ChatShell() {
           (results) => {
             setActiveSearchResults(results);
             setActiveToolActivity(null);
+            
+            // Find the matching running search event and update it with results
+            const runningEvent = pendingToolEventsRef.current.find(
+              (e) => e.type === "web_search" && e.status === "running"
+            );
+            
             // Stage for baking into the message on stream completion
             pendingToolEventsRef.current = [
+              ...pendingToolEventsRef.current.filter(
+                (e) => !(e.type === "web_search" && e.status === "running")
+              ),
               {
                 type: "web_search",
                 status: "completed",
@@ -800,6 +983,7 @@ export function ChatShell() {
                 results: results.results,
                 search_id: results.search_id,
                 timestamp: new Date().toISOString(),
+                toolId: runningEvent?.toolId ?? crypto.randomUUID(), // Preserve toolId from running event
               },
             ];
           },
@@ -828,10 +1012,21 @@ export function ChatShell() {
               setTodoCollapsed(false);
             }
           },
-          // onDeepResearchProgress — not rendered separately (progress visible via tokens)
-          undefined,
+          // onDeepResearchProgress — show progress steps in chat
+          (step) => {
+            setDeepResearchStep(step);
+          },
           // onTodoUpdate — live todo state updates from run_searches node
           (items) => { setTodoItems(items); },
+          handleTerminalOutput, // onTerminalOutput
+          handleTerminalComplete, // onTerminalComplete
+          handleBrowserNavigate, // onBrowserNavigate
+          handleBrowserClick, // onBrowserClick
+          handleBrowserScreenshot, // onBrowserScreenshot
+          handleToolStart, // onToolStart
+          handleToolEnd,   // onToolEnd
+          handlePlanning,  // onPlanning
+          handleReflection, // onReflection
         );
 
         void refreshSessions();
@@ -859,6 +1054,11 @@ export function ChatShell() {
           const bakedThinkingSeconds =
             thinkEnabledRef.current ? thoughtForSecondsRef.current : null;
 
+          // CRITICAL: Set isStreaming to false FIRST, then update message with baked events
+          // This ensures the message renders with toolEvents before live states are cleared
+          setIsStreaming(false);
+          streamingRef.current = false;
+
           if (bakedToolEvents.length > 0 || bakedThinkingSeconds !== null) {
             setMessages((prev) => {
               const last = prev[prev.length - 1];
@@ -870,12 +1070,17 @@ export function ChatShell() {
             });
             pendingToolEventsRef.current = [];
           }
-          setActiveToolActivity(null);
-          setActiveSearchResults(null);
-          setStreamingArtifact(null);
+          
+          // Clear live states AFTER baking events into message
+          // Use setTimeout to ensure message update completes first
+          setTimeout(() => {
+            setActiveToolActivity(null);
+            setActiveSearchResults(null);
+            setStreamingArtifact(null);
+            setDeepResearchStep(null);
+          }, 0);
+          
           abortControllerRef.current = null;
-          streamingRef.current = false;
-          setIsStreaming(false);
         }
       }
     },
@@ -923,6 +1128,7 @@ export function ChatShell() {
         pendingToolEventsRef.current = [];
         setActiveToolActivity(null);
         setActiveSearchResults(null);
+        setDeepResearchStep(null);
 
         await streamSessionChat(
           sessionId,
@@ -950,7 +1156,20 @@ export function ChatShell() {
             }
             void refreshSessions();
           },
-          undefined,           // onArtifactUpdated
+          // onArtifactUpdated — handle artifact updates during deep research
+          (artifact) => {
+            setArtifacts((prev) =>
+              prev.map((a) => (a.id === artifact.id ? artifact : a)),
+            );
+            if (selectedArtifactId === artifact.id || !isArtifactPanelOpen) {
+              setSelectedArtifactId(artifact.id);
+              if (!userClosedPanelRef.current) {
+                setIsArtifactPanelOpen(true);
+                setIsFilesPanelOpen(false);
+              }
+            }
+            void refreshSessions();
+          },
           undefined,           // onToolActivity
           undefined,           // onSearchResults
           undefined,           // onThinking
@@ -973,9 +1192,21 @@ export function ChatShell() {
               setTodoCollapsed(false);
             }
           },
-          undefined,           // onDeepResearchProgress
+          // onDeepResearchProgress — show progress steps in chat
+          (step) => {
+            setDeepResearchStep(step);
+          },
           // onTodoUpdate — live search-step progress updates
           (items) => { setTodoItems(items); },
+          handleTerminalOutput, // onTerminalOutput
+          handleTerminalComplete, // onTerminalComplete
+          handleBrowserNavigate, // onBrowserNavigate
+          handleBrowserClick, // onBrowserClick
+          handleBrowserScreenshot, // onBrowserScreenshot
+          handleToolStart, // onToolStart
+          handleToolEnd,   // onToolEnd
+          handlePlanning,  // onPlanning
+          handleReflection, // onReflection
         );
 
         void refreshSessions();
@@ -992,12 +1223,19 @@ export function ChatShell() {
         }
       } finally {
         if (streamGenRef.current === myGen) {
-          setActiveToolActivity(null);
-          setActiveSearchResults(null);
-          setStreamingArtifact(null);
-          abortControllerRef.current = null;
-          streamingRef.current = false;
+          // Set isStreaming to false first
           setIsStreaming(false);
+          streamingRef.current = false;
+          
+          // Clear live states after a microtask to ensure message updates complete
+          setTimeout(() => {
+            setActiveToolActivity(null);
+            setActiveSearchResults(null);
+            setStreamingArtifact(null);
+            setDeepResearchStep(null);
+          }, 0);
+          
+          abortControllerRef.current = null;
         }
       }
     },
@@ -1018,6 +1256,20 @@ export function ChatShell() {
       await sendMessage(prompt);
     }
   };
+
+  // ── Planning and reflection event handlers ────────────────────────────────
+  const [planningEvents, setPlanningEvents] = useState<PlanningEvent[]>([]);
+  const [reflectionEvents, setReflectionEvents] = useState<ReflectionEvent[]>([]);
+
+  const handlePlanning = useCallback((event: PlanningEvent) => {
+    setPlanningEvents(prev => [...prev, event]);
+    console.log("Planning event:", event);
+  }, []);
+
+  const handleReflection = useCallback((event: ReflectionEvent) => {
+    setReflectionEvents(prev => [...prev, event]);
+    console.log("Reflection event:", event);
+  }, []);
 
   const retryLastPrompt = async () => {
     if (!lastPrompt || isStreaming) return;
@@ -1048,6 +1300,7 @@ export function ChatShell() {
     setActiveToolActivity(null);
     setActiveSearchResults(null);
     setPendingDateCheck(null);
+    clearAllTools(); // Clear active tool cards
     pendingToolEventsRef.current = [];
     pendingMessageRef.current = null;
     pendingSendRef.current = false;
@@ -1058,7 +1311,77 @@ export function ChatShell() {
     setPendingClarifyingQuestions(null);
     setPendingResearchQuery(null);
     setTodoItems([]);
+    // Clear right sidebar state
+    rightSidebar.closeSidebar();
+    setTerminalOutput([]);
+    setCurrentCommand("");
+    setBrowserUrl("");
+    setBrowserScreenshot(null);
+    setBrowserStatus("idle");
+    setPlanningEvents([]);
+    setReflectionEvents([]);
+  }, [clearAllTools, rightSidebar]);
+
+  // ── Terminal event handlers ──────────────────────────────────────────────
+  const handleTerminalOutput = useCallback((event: TerminalOutputEvent) => {
+    const line: TerminalLine = {
+      content: event.content,
+      type: event.stream_type === "stderr" ? "stderr" : "stdout",
+      timestamp: event.timestamp,
+    };
+    
+    setTerminalOutput(prev => [...prev, line]);
+    
+    // Auto-open terminal tab if not already open
+    if (!rightSidebar.isOpen) {
+      rightSidebar.openSidebar("terminal");
+    } else if (rightSidebar.activeTab !== "terminal") {
+      rightSidebar.setActiveTab("terminal");
+    }
+  }, [rightSidebar]);
+
+  const handleTerminalComplete = useCallback((event: TerminalCompleteEvent) => {
+    const line: TerminalLine = {
+      content: `\n[Command completed with exit code ${event.exit_code}]`,
+      type: "stdout",
+      timestamp: event.timestamp,
+    };
+    
+    setTerminalOutput(prev => [...prev, line]);
+    setCurrentCommand("");
   }, []);
+
+  // ── Browser event handlers ────────────────────────────────────────────────
+  const handleBrowserNavigate = useCallback((event: BrowserNavigateEvent) => {
+    setBrowserUrl(event.url);
+    setBrowserStatus(event.status === "completed" ? "loaded" : 
+                    event.status === "failed" ? "error" : "loading");
+    
+    // Auto-open browser tab if navigation starts
+    if (event.status === "started" && !rightSidebar.isOpen) {
+      rightSidebar.openSidebar("browser");
+    } else if (event.status === "started" && rightSidebar.activeTab !== "browser") {
+      rightSidebar.setActiveTab("browser");
+    }
+  }, [rightSidebar]);
+
+  const handleBrowserClick = useCallback((event: BrowserClickEvent) => {
+    // Could add click indicators or status updates here
+    console.log("Browser click:", event);
+  }, []);
+
+  const handleBrowserScreenshot = useCallback((event: BrowserScreenshotEvent) => {
+    if (event.status === "completed" && !event.error) {
+      setBrowserScreenshot(event.filename);
+      
+      // Auto-open browser tab to show screenshot
+      if (!rightSidebar.isOpen) {
+        rightSidebar.openSidebar("browser");
+      } else if (rightSidebar.activeTab !== "browser") {
+        rightSidebar.setActiveTab("browser");
+      }
+    }
+  }, [rightSidebar]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
@@ -1565,6 +1888,22 @@ export function ChatShell() {
                   <span className="files-btn-badge">{artifacts.length}</span>
                 </button>
               )}
+              
+              {/* Right sidebar toggle button */}
+              <button
+                type="button"
+                onClick={() => rightSidebar.isOpen ? rightSidebar.closeSidebar() : rightSidebar.openSidebar()}
+                className={`flex h-7 items-center gap-1.5 px-2 text-[12px] font-medium transition-colors ${
+                  rightSidebar.isOpen
+                    ? "bg-accent text-white"
+                    : "text-text-3 hover:text-text-1"
+                }`}
+                title="Toggle sidebar"
+              >
+                <Terminal size={13} />
+                <span>Tools</span>
+              </button>
+              
               {/* New chat button */}
               <button
                 type="button"
@@ -1730,16 +2069,83 @@ export function ChatShell() {
 
                               {(() => {
                                 const isCurrentMsg = isStreaming && index === messages.length - 1;
-                                // Streaming with no artifact yet — strip partial XML (fallback path)
+                                
+                                // Streaming with no artifact yet — strip partial XML and render inline tools
                                 if (isCurrentMsg && !message.artifactId) {
+                                  const cleanContent = stripPartialArtifactBlock(message.content);
+                                  const segments = parseMessageWithToolEvents(cleanContent);
+                                  
                                   return (
-                                    <div className="markdown-content">
-                                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                                        {stripPartialArtifactBlock(message.content)}
-                                      </ReactMarkdown>
-                                    </div>
+                                    <>
+                                      {segments.map((segment, segIdx) => {
+                                        if (segment.type === "text") {
+                                          return (
+                                            <div key={segIdx} className="markdown-content">
+                                              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                                                {segment.content}
+                                              </ReactMarkdown>
+                                            </div>
+                                          );
+                                        } else {
+                                          // Render tool card inline
+                                          const toolEvent = pendingToolEventsRef.current.find(
+                                            (e) => e.toolId === segment.toolId
+                                          );
+                                          
+                                          if (segment.toolType === "web_search" && toolEvent?.type === "web_search") {
+                                            return (
+                                              <div key={segIdx} className="tool-events-container my-2">
+                                                <WebSearchBlock
+                                                  status={toolEvent.status === "running" ? "running" : toolEvent.status === "error" ? "error" : "completed"}
+                                                  query={toolEvent.query}
+                                                  results={toolEvent.status === "completed" ? toolEvent.results : undefined}
+                                                  resultCount={toolEvent.status === "completed" ? toolEvent.result_count : undefined}
+                                                  errorMessage={toolEvent.message}
+                                                />
+                                              </div>
+                                            );
+                                          } else if (segment.toolType === "date_check" && toolEvent?.type === "date_check") {
+                                            // Date check is shown via pendingDateCheck state, not rendered inline
+                                            return null;
+                                          } else {
+                                            // Handle generic tool events (tool_start/tool_end) during streaming
+                                            const toolStartEvent = pendingToolEventsRef.current.find(
+                                              (e) => e.type === "tool_start" && e.toolId === segment.toolId
+                                            ) as ToolStartEvent | undefined;
+                                            const toolEndEvent = pendingToolEventsRef.current.find(
+                                              (e) => e.type === "tool_end" && e.toolId === segment.toolId
+                                            ) as ToolEndEvent | undefined;
+                                            
+                                            if (toolStartEvent || toolEndEvent) {
+                                              const toolName = toolEndEvent?.tool_name || toolStartEvent?.tool_name || "unknown";
+                                              const status = toolEndEvent ? (toolEndEvent.status === "success" ? "completed" : "failed") : "loading";
+                                              const parameters = toolStartEvent?.parameters;
+                                              const duration = toolEndEvent?.duration_ms;
+                                              const output = toolEndEvent?.result_summary;
+                                              const error = toolEndEvent?.error;
+                                              
+                                              return (
+                                                <div key={segIdx} className="tool-events-container my-2">
+                                                  <ToolCard
+                                                    toolId={segment.toolId}
+                                                    toolName={toolName}
+                                                    status={status as "loading" | "completed" | "failed"}
+                                                    parameters={parameters}
+                                                    duration={duration}
+                                                    output={output}
+                                                    error={error}
+                                                  />
+                                                </div>
+                                              );
+                                            }
+                                          }
+                                          return null;
+                                        }
+                                      })}
+                                    </>
                                   );
                                 }
+                                
                                 if (message.artifactId) {
                                   // Completed artifact: split content at sentinel/block for inline card
                                   const [before, after] = splitAroundArtifact(message.content);
@@ -1768,77 +2174,91 @@ export function ChatShell() {
                                     </>
                                   );
                                 }
-                                // Regular message (no artifact)
+                                
+                                // Regular message (no artifact) - render with inline tools
+                                const segments = parseMessageWithToolEvents(stripArtifactBlock(message.content));
+                                const toolEvents = message.toolEvents ?? [];
+                                
                                 return (
-                                  <div className="markdown-content">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                                      {stripArtifactBlock(message.content)}
-                                    </ReactMarkdown>
-                                  </div>
-                                );
-                              })()}
-
-                              {/* ── Live tool events (during streaming) — rendered after content ── */}
-                              {isStreaming &&
-                                index === messages.length - 1 &&
-                                (activeToolActivity?.tool === "web_search" || activeSearchResults) && (
-                                <div className="tool-events-container mt-2">
-                                  {activeToolActivity &&
-                                    activeToolActivity.tool === "web_search" &&
-                                    activeToolActivity.status === "running" && (
-                                      <WebSearchBlock
-                                        status="running"
-                                        query={activeToolActivity.query}
-                                      />
-                                    )}
-                                  {activeSearchResults && (
-                                    <WebSearchBlock
-                                      status="completed"
-                                      query={activeSearchResults.query}
-                                      results={activeSearchResults.results}
-                                      resultCount={activeSearchResults.result_count}
-                                    />
-                                  )}
-                                </div>
-                              )}
-
-                              {/* ── Persisted tool events — rendered after content ── */}
-                              {(!isStreaming || index < messages.length - 1) &&
-                                message.toolEvents &&
-                                message.toolEvents.some((e) => e.type === "web_search") && (
-                                  <div className="tool-events-container mt-2">
-                                    {message.toolEvents.map((event, ei) => {
-                                      if (event.type === "date_check") {
+                                  <>
+                                    {segments.map((segment, segIdx) => {
+                                      if (segment.type === "text") {
+                                        return (
+                                          <div key={segIdx} className="markdown-content">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                                              {segment.content}
+                                            </ReactMarkdown>
+                                          </div>
+                                        );
+                                      } else {
+                                        // Render tool card inline from persisted events
+                                        const toolEvent = toolEvents.find(
+                                          (e) => e.toolId === segment.toolId
+                                        );
+                                        
+                                        if (segment.toolType === "web_search" && toolEvent?.type === "web_search") {
+                                          if (toolEvent.status === "error" || toolEvent.results.length === 0) {
+                                            return (
+                                              <div key={segIdx} className="tool-events-container my-2">
+                                                <WebSearchBlock
+                                                  status="error"
+                                                  query={toolEvent.query}
+                                                  errorMessage={toolEvent.message}
+                                                />
+                                              </div>
+                                            );
+                                          }
+                                          return (
+                                            <div key={segIdx} className="tool-events-container my-2">
+                                              <WebSearchBlock
+                                                status="completed"
+                                                query={toolEvent.query}
+                                                results={toolEvent.results}
+                                                resultCount={toolEvent.result_count}
+                                              />
+                                            </div>
+                                          );
+                                        } else if (segment.toolType === "date_check") {
+                                          // Date check doesn't render a visible card
+                                          return null;
+                                        } else {
+                                          // Handle generic tool events (tool_start/tool_end)
+                                          const toolStartEvent = toolEvents.find(
+                                            (e) => e.type === "tool_start" && e.toolId === segment.toolId
+                                          ) as ToolStartEvent | undefined;
+                                          const toolEndEvent = toolEvents.find(
+                                            (e) => e.type === "tool_end" && e.toolId === segment.toolId
+                                          ) as ToolEndEvent | undefined;
+                                          
+                                          if (toolStartEvent || toolEndEvent) {
+                                            const toolName = toolEndEvent?.tool_name || toolStartEvent?.tool_name || "unknown";
+                                            const status = toolEndEvent ? (toolEndEvent.status === "success" ? "completed" : "failed") : "loading";
+                                            const parameters = toolStartEvent?.parameters;
+                                            const duration = toolEndEvent?.duration_ms;
+                                            const output = toolEndEvent?.result_summary;
+                                            const error = toolEndEvent?.error;
+                                            
+                                            return (
+                                              <div key={segIdx} className="tool-events-container my-2">
+                                                <ToolCard
+                                                  toolId={segment.toolId}
+                                                  toolName={toolName}
+                                                  status={status as "loading" | "completed" | "failed"}
+                                                  parameters={parameters}
+                                                  duration={duration}
+                                                  output={output}
+                                                  error={error}
+                                                />
+                                              </div>
+                                            );
+                                          }
+                                        }
                                         return null;
                                       }
-                                      if (event.type === "web_search") {
-                                        if (
-                                          event.status === "error" ||
-                                          event.results.length === 0
-                                        ) {
-                                          return (
-                                            <WebSearchBlock
-                                              key={event.search_id || `err-${ei}`}
-                                              status="error"
-                                              query={event.query}
-                                              errorMessage={event.message}
-                                            />
-                                          );
-                                        }
-                                        return (
-                                          <WebSearchBlock
-                                            key={event.search_id || `search-${ei}`}
-                                            status="completed"
-                                            query={event.query}
-                                            results={event.results}
-                                            resultCount={event.result_count}
-                                          />
-                                        );
-                                      }
-                                      return null;
                                     })}
-                                  </div>
-                                )}
+                                  </>
+                                );
+                              })()}
 
                               {(!isStreaming || index < messages.length - 1) && (
                                 <div className="mt-3 flex items-center gap-2">
@@ -1894,7 +2314,7 @@ export function ChatShell() {
                             index === messages.length - 1 ? (
                             <>
                               {/* Live tool events when there is no response text yet */}
-                              {(activeToolActivity?.tool === "web_search" || activeSearchResults) && (
+                              {(activeToolActivity?.tool === "web_search" || activeSearchResults || deepResearchStep || activeTools.length > 0) && (
                                 <div className="tool-events-container">
                                   {activeToolActivity &&
                                     activeToolActivity.tool === "web_search" &&
@@ -1912,10 +2332,29 @@ export function ChatShell() {
                                       resultCount={activeSearchResults.result_count}
                                     />
                                   )}
+                                  {deepResearchStep && (
+                                    <DeepResearchBlock
+                                      step={deepResearchStep as "evaluating" | "synthesizing" | "writing"}
+                                    />
+                                  )}
+                                  {/* Active tool cards */}
+                                  {activeTools.map((tool) => (
+                                    <ToolCard
+                                      key={tool.toolId}
+                                      toolId={tool.toolId}
+                                      toolName={tool.toolName}
+                                      status={tool.status}
+                                      parameters={tool.parameters}
+                                      duration={tool.duration}
+                                      output={tool.output}
+                                      error={tool.error}
+                                      className="mb-2"
+                                    />
+                                  ))}
                                 </div>
                               )}
                               {/* Generating indicator — shown when no content and no active tool */}
-                              {!activeToolActivity && !activeSearchResults && (
+                              {!activeToolActivity && !activeSearchResults && !deepResearchStep && !hasReceivedFirstTokenRef.current && message.content.length === 0 && (
                                 <div
                                   className="tool-block"
                                   aria-live="polite"
@@ -2004,6 +2443,43 @@ export function ChatShell() {
             />
           </div>
         )}
+
+        {/* ── RIGHT SIDEBAR ────────────────────────────────────────────────── */}
+        <RightSidebar
+          isOpen={rightSidebar.isOpen}
+          activeTab={rightSidebar.activeTab}
+          isCollapsed={rightSidebar.isCollapsed}
+          width={rightSidebar.width}
+          terminalProps={{
+            output: terminalOutput,
+            onClear: () => setTerminalOutput([]),
+            theme: "dark",
+            autoScroll: true,
+          }}
+          browserProps={{
+            screenshotPath: browserScreenshot || undefined,
+            currentUrl: browserUrl || undefined,
+            sessionName: "default",
+            isLoading: browserStatus === "loading",
+            error: browserStatus === "error" ? "Browser error" : undefined,
+            onRefresh: () => {
+              // Could trigger a browser refresh action here
+              console.log("Browser refresh requested");
+            },
+          }}
+          filesProps={{
+            fileTree: [],
+            recentOperations: [],
+            isLoading: false,
+            onRefresh: () => {
+              console.log("Files refresh requested");
+            },
+          }}
+          onTabChange={rightSidebar.setActiveTab}
+          onClose={rightSidebar.closeSidebar}
+          onToggleCollapse={rightSidebar.toggleCollapse}
+          onResize={rightSidebar.setWidth}
+        />
 
         {/* ── FILES SIDEBAR (far right — only shown when artifact panel is closed) */}
         <FilesPanel

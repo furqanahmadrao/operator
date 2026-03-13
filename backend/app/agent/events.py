@@ -124,6 +124,120 @@ def sse_todo_update(items: list[dict]) -> str:
     return sse({"type": "todo_update", "items": items})
 
 
+def sse_planning(sub_tasks: list[str], reasoning: str) -> str:
+    """Emit planning event from deep agent."""
+    return sse({
+        "type": "planning",
+        "sub_tasks": sub_tasks,
+        "reasoning": reasoning
+    })
+
+
+def sse_reflection(reflection_type: str, content: str, progress: dict) -> str:
+    """Emit reflection event from deep agent."""
+    return sse({
+        "type": "reflection",
+        "reflection_type": reflection_type,
+        "content": content,
+        "progress": progress
+    })
+
+
+def sse_progress_update(task_name: str, current_step: int, total_steps: int, 
+                       step_description: str, status: str) -> str:
+    """Emit progress update event from deep agent."""
+    return sse({
+        "type": "progress_update",
+        "task_name": task_name,
+        "current_step": current_step,
+        "total_steps": total_steps,
+        "step_description": step_description,
+        "status": status
+    })
+
+
+def sse_tool_start(tool_name: str, arguments: dict) -> str:
+    """Emit tool start event from deep agent."""
+    return sse({
+        "type": "tool_start",
+        "tool_name": tool_name,
+        "arguments": arguments
+    })
+
+
+def sse_tool_end(tool_name: str, success: bool, result: str) -> str:
+    """Emit tool end event from deep agent."""
+    return sse({
+        "type": "tool_end",
+        "tool_name": tool_name,
+        "success": success,
+        "result": result
+    })
+
+
+def sse_terminal_output(content: str, stream_type: str = "stdout", 
+                       command_context: str = None, working_directory: str = "/workspace") -> str:
+    """Emit terminal output event."""
+    return sse({
+        "type": "terminal_output",
+        "content": content,
+        "stream_type": stream_type,
+        "command_context": command_context,
+        "working_directory": working_directory
+    })
+
+
+def sse_terminal_complete(exit_code: int, command: str, duration_ms: int) -> str:
+    """Emit terminal command completion event."""
+    return sse({
+        "type": "terminal_complete",
+        "exit_code": exit_code,
+        "command": command,
+        "duration_ms": duration_ms
+    })
+
+
+def sse_browser_navigate(url: str, session_name: str, status: str, error: str = None) -> str:
+    """Emit browser navigation event."""
+    return sse({
+        "type": "browser_navigate",
+        "url": url,
+        "session_name": session_name,
+        "status": status,
+        "error": error
+    })
+
+
+def sse_browser_action(action: str, session_name: str, details: dict = None) -> str:
+    """Emit browser action event."""
+    return sse({
+        "type": "browser_action",
+        "action": action,
+        "session_name": session_name,
+        "details": details or {}
+    })
+
+
+def sse_browser_screenshot(screenshot_path: str, session_name: str) -> str:
+    """Emit browser screenshot event."""
+    return sse({
+        "type": "browser_screenshot",
+        "screenshot_path": screenshot_path,
+        "session_name": session_name
+    })
+
+
+def sse_file_operation(operation: str, path: str, size_bytes: int = None, file_type: str = None) -> str:
+    """Emit file operation event."""
+    return sse({
+        "type": "file_operation",
+        "operation": operation,
+        "path": path,
+        "size_bytes": size_bytes,
+        "file_type": file_type
+    })
+
+
 # ---------------------------------------------------------------------------
 # Per-turn accumulator
 # ---------------------------------------------------------------------------

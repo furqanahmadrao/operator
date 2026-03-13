@@ -6,7 +6,17 @@ pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 aiosqlite>=0.20.0
 tavily-python>=0.5.0
+psutil>=5.9.0
 # Agent runtime
 langgraph>=0.3
 langchain-core>=0.3
 langchain-openai>=0.2
+litellm>=1.81.13
+langchain-litellm>=0.1.0
+# Browser automation
+playwright>=1.40.0
+browser-use>=0.1.0
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+hypothesis>=6.0.0

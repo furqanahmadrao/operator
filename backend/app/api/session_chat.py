@@ -28,6 +28,7 @@ import logging
 import re
 import uuid
 from datetime import datetime, timezone
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -39,21 +40,34 @@ from app.agent.agent import (
     agent_without_search,
 )
 from app.agent.context import build_messages_for_turn
+from app.agent.deep_agent import run_deep_agent
 from app.agent.deep_research import generate_clarifying_questions, run_deep_research_graph
 from app.agent.events import (
     TurnAccumulator,
     sse_artifact_created,
     sse_artifact_updated,
+    sse_browser_action,
+    sse_browser_navigate,
+    sse_browser_screenshot,
     sse_clarifying_questions,
     sse_error,
+    sse_file_operation,
     sse_message_ids,
+    sse_planning,
+    sse_progress_update,
+    sse_reflection,
     sse_search_results,
+    sse_terminal_complete,
+    sse_terminal_output,
     sse_thinking,
     sse_token,
     sse_tool_activity,
+    sse_tool_end,
+    sse_tool_start,
 )
 from app.api.schemas import SessionChatRequest
 from app.services import artifact_service, session_service
+from app.services.activity_stream import get_activity_stream
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +121,70 @@ async def session_chat(session_id: str, request: SessionChatRequest):
         raise HTTPException(status_code=404, detail="Session not found")
 
     async def event_generator():  # noqa: PLR0912, PLR0915
+        # ── Initialize activity stream integration ─────────────────────────
+        activity_stream = get_activity_stream()
+        
+        # Queue to collect activity events for SSE emission
+        activity_events = []
+        
+        async def activity_handler(event):
+            """Handler for activity stream events - converts to SSE format."""
+            event_type = event.event_type.value
+            payload = event.payload
+            
+            if event_type == "tool_start":
+                activity_events.append(sse_tool_start(
+                    payload.get("tool_name", ""),
+                    payload.get("arguments", {})
+                ))
+            elif event_type == "tool_end":
+                activity_events.append(sse_tool_end(
+                    payload.get("tool_name", ""),
+                    payload.get("success", False),
+                    payload.get("result", "")
+                ))
+            elif event_type == "terminal_output":
+                activity_events.append(sse_terminal_output(
+                    payload.get("content", ""),
+                    payload.get("stream_type", "stdout"),
+                    payload.get("command_context"),
+                    payload.get("working_directory", "/workspace")
+                ))
+            elif event_type == "terminal_complete":
+                activity_events.append(sse_terminal_complete(
+                    payload.get("exit_code", 0),
+                    payload.get("command", ""),
+                    payload.get("duration_ms", 0)
+                ))
+            elif event_type == "browser_navigate":
+                activity_events.append(sse_browser_navigate(
+                    payload.get("url", ""),
+                    payload.get("session_name", "default"),
+                    payload.get("status", "started"),
+                    payload.get("error")
+                ))
+            elif event_type == "browser_click":
+                activity_events.append(sse_browser_action(
+                    "click",
+                    payload.get("session_name", "default"),
+                    {"selector": payload.get("selector", "")}
+                ))
+            elif event_type == "browser_screenshot":
+                activity_events.append(sse_browser_screenshot(
+                    payload.get("screenshot_path", ""),
+                    payload.get("session_name", "default")
+                ))
+            elif event_type in ["file_created", "file_modified", "file_deleted"]:
+                activity_events.append(sse_file_operation(
+                    event_type.replace("file_", ""),
+                    payload.get("path", ""),
+                    payload.get("size_bytes"),
+                    payload.get("file_type")
+                ))
+        
+        # Register activity handler for this session
+        activity_stream.register_handler(session_id, activity_handler)
+        
         # ── 1. Resolve project system prompt ──────────────────────────────
         project_system_prompt: str | None = None
         if session.get("project_id"):
@@ -260,7 +338,146 @@ async def session_chat(session_id: str, request: SessionChatRequest):
             yield "data: [DONE]\n\n"
             return
 
-        # ── 3. Select agent and build per-request config ──────────────────
+        # ── 3a. Deep agent: Route to deep agent when enabled ──────────────
+        if request.deep_agent_enabled:
+            import asyncio as _asyncio  # noqa: PLC0415
+
+            # Save user message immediately
+            user_msg_id = await session_service.save_message(
+                session_id, "user", request.content
+            )
+
+            # Create placeholder assistant message
+            asst_msg_id = await session_service.save_message(
+                session_id, "assistant", ""  # will be updated after completion
+            )
+
+            # Emit message IDs immediately
+            yield sse_message_ids(user_msg_id, asst_msg_id)
+            yield sse_token("Starting deep agent execution…\n\n")
+
+            # Create SSE queue for deep agent events
+            sse_queue: _asyncio.Queue = _asyncio.Queue()
+            deep_agent_exception: Exception | None = None
+            final_response: str = ""
+
+            # Run deep agent in background task
+            async def _run_deep_agent() -> None:
+                nonlocal deep_agent_exception, final_response
+                try:
+                    async for state_update in run_deep_agent(
+                        messages=messages,
+                        session_id=session_id,
+                        sse_queue=sse_queue
+                    ):
+                        # Extract final response from the last state update
+                        if "messages" in state_update:
+                            ai_messages = [msg for msg in state_update["messages"] 
+                                         if hasattr(msg, 'content') and msg.content]
+                            if ai_messages:
+                                final_response = ai_messages[-1].content
+                except Exception as exc:  # noqa: BLE001
+                    deep_agent_exception = exc
+                finally:
+                    await sse_queue.put(None)  # sentinel
+
+            deep_agent_task = _asyncio.create_task(_run_deep_agent())
+
+            # Drain SSE queue in real-time
+            try:
+                while True:
+                    try:
+                        event = await _asyncio.wait_for(sse_queue.get(), timeout=0.1)
+                    except _asyncio.TimeoutError:
+                        if deep_agent_task.done():
+                            break
+                        continue
+                    
+                    if event is None:  # sentinel
+                        break
+                    
+                    # Convert deep agent events to SSE format
+                    event_type = event.get("type")
+                    payload = event.get("payload", {})
+                    
+                    if event_type == "planning":
+                        yield sse_planning(
+                            payload.get("sub_tasks", []),
+                            payload.get("reasoning", "")
+                        )
+                    elif event_type == "reflection":
+                        yield sse_reflection(
+                            payload.get("reflection_type", "intermediate"),
+                            payload.get("content", ""),
+                            payload.get("progress", {})
+                        )
+                    elif event_type == "progress_update":
+                        yield sse_progress_update(
+                            payload.get("task_name", ""),
+                            payload.get("current_step", 0),
+                            payload.get("total_steps", 0),
+                            payload.get("step_description", ""),
+                            payload.get("status", "in_progress")
+                        )
+                    elif event_type == "tool_start":
+                        yield sse_tool_start(
+                            payload.get("tool_name", ""),
+                            payload.get("arguments", {})
+                        )
+                    elif event_type == "tool_end":
+                        yield sse_tool_end(
+                            payload.get("tool_name", ""),
+                            payload.get("success", False),
+                            payload.get("result", "")
+                        )
+                    elif event_type == "error":
+                        yield sse_error(payload.get("message", "Deep agent error"))
+
+                # Drain any remaining events
+                while not sse_queue.empty():
+                    event = sse_queue.get_nowait()
+                    if event is None:
+                        continue
+                    # Process remaining events (same logic as above)
+                    event_type = event.get("type")
+                    payload = event.get("payload", {})
+                    if event_type == "error":
+                        yield sse_error(payload.get("message", "Deep agent error"))
+
+            finally:
+                if not deep_agent_task.done():
+                    deep_agent_task.cancel()
+                    try:
+                        await deep_agent_task
+                    except (_asyncio.CancelledError, Exception):
+                        pass
+
+            # Handle deep agent errors
+            if deep_agent_exception:
+                log.exception("Deep agent execution error: %s", deep_agent_exception)
+                yield sse_error(f"Deep agent execution failed: {deep_agent_exception}")
+                yield "data: [DONE]\n\n"
+                return
+
+            # Emit final response tokens
+            if final_response:
+                yield sse_token(final_response)
+                
+                # Update assistant message with final response
+                await session_service.update_message_content(asst_msg_id, final_response)
+            else:
+                # Fallback response
+                fallback_response = "Deep agent execution completed."
+                yield sse_token(fallback_response)
+                await session_service.update_message_content(asst_msg_id, fallback_response)
+
+            # Session bookkeeping
+            await session_service.auto_title_session(session_id, request.content)
+            await session_service.touch_session(session_id)
+            yield "data: [DONE]\n\n"
+            return
+
+        # ── 3b. Select agent and build per-request config ──────────────────
         # 4-way matrix: think_enabled × web_search_enabled
         if request.think_enabled:
             agent = (
@@ -282,6 +499,7 @@ async def session_chat(session_id: str, request: SessionChatRequest):
 
         # ── 4. Stream agent events → SSE ──────────────────────────────────
         acc = TurnAccumulator()
+        log.info(f"Starting agent stream for session {session_id}")
         try:
             async for event in agent.astream_events(
                 {"messages": messages},
@@ -293,21 +511,54 @@ async def session_chat(session_id: str, request: SessionChatRequest):
 
                 # ── LLM text tokens ──────────────────────────────────────
                 if ev_type == "on_chat_model_stream":
+                    log.debug(f"Stream chunk received from {ev_name}")
                     chunk = event["data"]["chunk"]
-                    # Skip chunks that carry only tool-call argument fragments.
-                    # These chunks contain structured JSON for the function call
-                    # parameters, NOT displayable text — forwarding them would
-                    # inject raw JSON into the response stream.
-                    if getattr(chunk, "tool_call_chunks", None):
-                        continue
                     content = chunk.content
+                    # Skip chunks that carry ONLY tool-call argument fragments
+                    # (no displayable text). Some providers attach tool_call_chunks
+                    # metadata to every chunk even when text is present — we must
+                    # check that content is actually empty before skipping.
+                    tool_chunks = getattr(chunk, "tool_call_chunks", None)
+                    if tool_chunks and not content:
+                        log.debug("Skipping chunk with only tool call data")
+                        continue
                     if isinstance(content, str) and content:
+                        log.debug(f"Processing string content: {content[:50]}")
                         resp_text, think_text = acc.feed_chunk(content)
                         if resp_text:
+                            log.debug(f"Yielding token: {resp_text[:50]}")
                             yield sse_token(resp_text)
                         if think_text:
                             yield sse_thinking(think_text)
+                        
+                        # Check if a complete artifact has been written during streaming
+                        # and emit it immediately so the panel opens with live content
+                        if "</artifact>" in acc.full_response and not acc.created_artifact_ids:
+                            clean_text, artifact_data = artifact_service.extract_artifact(
+                                acc.full_response
+                            )
+                            if artifact_data:
+                                # Create artifact in DB immediately
+                                artifact = await artifact_service.create_artifact(
+                                    session_id=session_id,
+                                    title=artifact_data["title"],
+                                    content=artifact_data["content"],
+                                    artifact_type=artifact_data["type"],
+                                    source_message_id=None,  # Will be linked after message is saved
+                                )
+                                acc.created_artifact_ids.append(artifact["id"])
+                                # Strip the artifact tags from the accumulated response
+                                acc.full_response = clean_text
+                                # Emit the artifact so the panel opens immediately
+                                yield sse_artifact_created(artifact)
+                                log.info(
+                                    "Streaming artifact created: id=%s title=%r type=%s",
+                                    artifact["id"],
+                                    artifact["title"],
+                                    artifact["type"],
+                                )
                     elif isinstance(content, list):
+                        log.debug(f"Processing list content with {len(content)} parts")
                         # Content-block format (Anthropic / some NVIDIA models)
                         for part in content:
                             if isinstance(part, dict) and part.get("type") == "text":
@@ -318,9 +569,34 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                                         yield sse_token(resp_text)
                                     if think_text:
                                         yield sse_thinking(think_text)
+                                    
+                                    # Check for complete artifact (same as above)
+                                    if "</artifact>" in acc.full_response and not acc.created_artifact_ids:
+                                        clean_text, artifact_data = artifact_service.extract_artifact(
+                                            acc.full_response
+                                        )
+                                        if artifact_data:
+                                            artifact = await artifact_service.create_artifact(
+                                                session_id=session_id,
+                                                title=artifact_data["title"],
+                                                content=artifact_data["content"],
+                                                artifact_type=artifact_data["type"],
+                                                source_message_id=None,
+                                            )
+                                            acc.created_artifact_ids.append(artifact["id"])
+                                            acc.full_response = clean_text
+                                            yield sse_artifact_created(artifact)
+                                            log.info(
+                                                "Streaming artifact created: id=%s title=%r type=%s",
+                                                artifact["id"],
+                                                artifact["title"],
+                                                artifact["type"],
+                                            )
+                    else:
+                        log.debug(f"Unexpected content type: {type(content)}, value: {content}")
 
                 # ── Tool start — show activity spinner ───────────────────
-                # Only web_search gets an activity spinner; internal tools
+                # Only web_search and web_fetch get activity spinners; internal tools
                 # (create_artifact, list_session_artifacts, get_current_datetime)
                 # must NOT emit tool_activity events here — the frontend has no
                 # dedicated handler for them and incorrectly maps them to the
@@ -328,16 +604,44 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                 # Artifact creation is surfaced via sse_artifact_created instead.
                 elif ev_type == "on_tool_start":
                     tool_input = event["data"].get("input", {})
+                    
+                    # Emit activity stream event for all tools
+                    await activity_stream.emit(
+                        session_id=session_id,
+                        event_type="tool_start",
+                        payload={
+                            "tool_name": ev_name,
+                            "arguments": tool_input
+                        }
+                    )
+                    
                     if ev_name == "web_search":
                         yield sse_tool_activity(
                             "web_search",
                             "running",
                             query=tool_input.get("query", ""),
                         )
+                    elif ev_name == "web_fetch":
+                        yield sse_tool_activity(
+                            "web_fetch",
+                            "running",
+                            url=tool_input.get("url", ""),
+                        )
 
                 # ── Tool end — emit structured results or artifact ────────
                 elif ev_type == "on_tool_end":
                     raw_output = _extract_tool_output(event["data"].get("output"))
+                    
+                    # Emit activity stream event for all tools
+                    await activity_stream.emit(
+                        session_id=session_id,
+                        event_type="tool_end",
+                        payload={
+                            "tool_name": ev_name,
+                            "success": True,  # Will be updated based on parsing
+                            "result": raw_output
+                        }
+                    )
 
                     if ev_name == "web_search":
                         try:
@@ -372,6 +676,28 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                                 "Could not parse web_search output: %r", raw_output
                             )
 
+                    elif ev_name == "web_fetch":
+                        try:
+                            data = json.loads(raw_output)
+                            if data.get("status") == "success":
+                                yield sse_tool_activity(
+                                    "web_fetch",
+                                    "completed",
+                                    url=data.get("url", ""),
+                                    domain=data.get("domain", ""),
+                                    title=data.get("title"),
+                                )
+                            else:
+                                yield sse_tool_activity(
+                                    "web_fetch",
+                                    "error",
+                                    message=data.get("message", "Fetch failed."),
+                                )
+                        except (json.JSONDecodeError, KeyError):
+                            log.warning(
+                                "Could not parse web_fetch output: %r", raw_output
+                            )
+
                     elif ev_name == "create_artifact":
                         try:
                             data = json.loads(raw_output)
@@ -382,6 +708,11 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                                 artifact = await artifact_service.get_artifact(artifact_id)
                                 if artifact:
                                     yield sse_artifact_created(artifact)
+                            elif data.get("status") == "error":
+                                # Emit error event so frontend can show user feedback
+                                yield sse_error(
+                                    f"Failed to create artifact: {data.get('message', 'Unknown error')}"
+                                )
                         except (json.JSONDecodeError, KeyError):
                             log.warning(
                                 "Could not parse create_artifact output: %r",
@@ -398,6 +729,11 @@ async def session_chat(session_id: str, request: SessionChatRequest):
                                 artifact = await artifact_service.get_artifact(artifact_id)
                                 if artifact:
                                     yield sse_artifact_updated(artifact)
+                            elif data.get("status") == "error":
+                                # Emit error event so frontend can show user feedback
+                                yield sse_error(
+                                    f"Failed to update artifact: {data.get('message', 'Unknown error')}"
+                                )
                         except (json.JSONDecodeError, KeyError):
                             log.warning(
                                 "Could not parse update_artifact output: %r",
@@ -441,66 +777,86 @@ async def session_chat(session_id: str, request: SessionChatRequest):
             yield "data: [DONE]\n\n"
             return
 
-        # ── 5. Fallback: XML artifact extraction if tool was not called ────
-        # Preserves compatibility with any residual <artifact> tag output.
-        fallback_artifact_data: dict | None = None
-        if not acc.created_artifact_ids:
-            clean_text, fallback_artifact_data = artifact_service.extract_artifact(
-                acc.full_response
+        # ── 5–9. Post-agent persistence (always send [DONE], even on DB error) ─
+        # Wrap in try/finally so a transient DB or artifact failure can never
+        # leave the client hanging — [DONE] is always the last SSE event.
+        done_sent = False
+        try:
+            # ── 5. Fallback: XML artifact extraction if tool was not called ──
+            # Preserves compatibility with any residual <artifact> tag output.
+            # Skip if we already created an artifact during streaming.
+            fallback_artifact_data: dict | None = None
+            if not acc.created_artifact_ids:
+                clean_text, fallback_artifact_data = artifact_service.extract_artifact(
+                    acc.full_response
+                )
+                if fallback_artifact_data:
+                    acc.full_response = clean_text  # strip tags from persisted message
+
+            # ── 6. Persist user + assistant messages ────────────────────────
+            metadata_json: str | None = None
+            if acc.search_events:
+                metadata_json = json.dumps({"tool_events": acc.search_events})
+
+            # Strip any residual <think> blocks before saving — feed_chunk()
+            # handles them during streaming, but guard against edge cases where
+            # the stream ended inside a still-open <think> block.
+            clean_response = _strip_thinking(acc.full_response)
+
+            user_msg_id = await session_service.save_message(
+                session_id, "user", request.content
             )
+            asst_msg_id = await session_service.save_message(
+                session_id, "assistant", clean_response, metadata_json=metadata_json
+            )
+
+            # ── 7. Link tool-created artifacts to the saved message ─────────
+            # (a) Artifacts created via the create_artifact tool
+            # Note: sse_artifact_created was already emitted mid-stream in on_tool_end
+            for artifact_id in acc.created_artifact_ids:
+                await artifact_service.update_artifact_source_message(
+                    artifact_id, asst_msg_id
+                )
+                await session_service.update_message_artifact(asst_msg_id, artifact_id)
+
+            # (b) Artifacts updated via the update_artifact tool
+            # Note: sse_artifact_updated was already emitted mid-stream in on_tool_end
+            for artifact_id in acc.updated_artifact_ids:
+                await session_service.update_message_artifact(asst_msg_id, artifact_id)
+
+            # (c) Fallback XML-extracted artifact (only if tool was not called)
             if fallback_artifact_data:
-                acc.full_response = clean_text  # strip tags from persisted message
+                artifact = await artifact_service.create_artifact(
+                    session_id=session_id,
+                    title=fallback_artifact_data["title"],
+                    content=fallback_artifact_data["content"],
+                    artifact_type=fallback_artifact_data["type"],
+                    source_message_id=asst_msg_id,
+                )
+                await session_service.update_message_artifact(asst_msg_id, artifact["id"])
+                yield sse_artifact_created(artifact)
 
-        # ── 6. Persist user + assistant messages ──────────────────────────
-        metadata_json: str | None = None
-        if acc.search_events:
-            metadata_json = json.dumps({"tool_events": acc.search_events})
+            # ── 8. Session bookkeeping ───────────────────────────────────────
+            await session_service.auto_title_session(session_id, request.content)
+            await session_service.touch_session(session_id)
 
-        # Strip any residual <think> blocks before saving — feed_chunk()
-        # handles them during streaming, but guard against edge cases where
-        # the stream ended inside a still-open <think> block.
-        clean_response = _strip_thinking(acc.full_response)
+            # ── 9. Emit message IDs then close stream ────────────────────────
+            yield sse_message_ids(user_msg_id, asst_msg_id)
+            yield "data: [DONE]\n\n"
+            done_sent = True
 
-        user_msg_id = await session_service.save_message(
-            session_id, "user", request.content
-        )
-        asst_msg_id = await session_service.save_message(
-            session_id, "assistant", clean_response, metadata_json=metadata_json
-        )
-
-        # ── 7. Link tool-created artifacts to the saved message ────────────
-        # (a) Artifacts created via the create_artifact tool
-        # Note: sse_artifact_created was already emitted mid-stream in on_tool_end
-        for artifact_id in acc.created_artifact_ids:
-            await artifact_service.update_artifact_source_message(
-                artifact_id, asst_msg_id
-            )
-            await session_service.update_message_artifact(asst_msg_id, artifact_id)
-
-        # (b) Artifacts updated via the update_artifact tool
-        # Note: sse_artifact_updated was already emitted mid-stream in on_tool_end
-        for artifact_id in acc.updated_artifact_ids:
-            await session_service.update_message_artifact(asst_msg_id, artifact_id)
-
-        # (c) Fallback XML-extracted artifact (only if tool was not called)
-        if fallback_artifact_data:
-            artifact = await artifact_service.create_artifact(
-                session_id=session_id,
-                title=fallback_artifact_data["title"],
-                content=fallback_artifact_data["content"],
-                artifact_type=fallback_artifact_data["type"],
-                source_message_id=asst_msg_id,
-            )
-            await session_service.update_message_artifact(asst_msg_id, artifact["id"])
-            yield sse_artifact_created(artifact)
-
-        # ── 8. Session bookkeeping ─────────────────────────────────────────
-        await session_service.auto_title_session(session_id, request.content)
-        await session_service.touch_session(session_id)
-
-        # ── 9. Emit message IDs then close stream ──────────────────────────
-        yield sse_message_ids(user_msg_id, asst_msg_id)
-        yield "data: [DONE]\n\n"
+        except Exception as db_err:  # noqa: BLE001
+            log.exception("Post-agent persistence error: %s", db_err)
+            if not done_sent:
+                yield sse_error("Failed to save conversation history.")
+                yield "data: [DONE]\n\n"
+        
+        # ── Cleanup activity stream handler and emit pending events ──────
+        activity_stream.unregister_handler(session_id, activity_handler)
+        
+        # Emit any pending activity events before closing
+        for event in activity_events:
+            yield event
 
     return StreamingResponse(
         event_generator(),

@@ -26,33 +26,43 @@ INLINE (default) — use for almost everything:
   - Summaries shorter than ~300 words of prose"""
 
 _ARTIFACT_POLICY_SECTION = """\
-ARTIFACT TOOL
-=============
+ARTIFACTS
+=========
 
-You have access to a ``create_artifact`` tool. Use it for long-form standalone
-documents the user would save, export, or refer back to, such as:
+For long-form standalone documents the user would save, export, or refer back to,
+write them inline using <artifact> tags with streaming support:
 
-  artifact_type="markdown"  (default for prose documents)
+  <artifact title="Document Title" type="markdown">
+  Content goes here...
+  </artifact>
+
+Use artifacts for:
+
+  type="markdown"  (default for prose documents)
     - Written reports, analyses, or research write-ups (~400+ words of prose)
     - Project plans, roadmaps, or structured proposals
     - Full templates: README, email, contract, resume, cover letter
     - Formal technical specifications or design documents
 
-  artifact_type="html"  (use when the user asks for a web page, landing page,
+  type="html"  (use when the user asks for a web page, landing page,
                UI dashboard, interactive visualization, or rendered HTML)
     - Self-contained HTML page with all CSS and JS inlined
     - Fully valid HTML5 with <!DOCTYPE html>, <html>, <head>, <body>
     - May use vanilla JS, inline SVG, Canvas — no external frameworks
 
-DO NOT call create_artifact for:
+DO NOT use artifacts for:
   - Code snippets, short Q&A answers, or anything conversational
   - Content under ~300 words of prose
   - Code always stays inline as fenced code blocks — no exceptions
 
-When you decide to create an artifact:
+When you create an artifact:
 1. Write one short intro sentence in chat (e.g. "Here is the plan you asked for.")
-2. Call create_artifact with: title (2–6 words, title-cased), artifact_type, content
-3. Only one artifact per response maximum."""
+2. Write the <artifact> tag with title (2–6 words, title-cased) and type attributes
+3. Write the content directly — it will stream live to the user
+4. Close with </artifact>
+5. Only one artifact per response maximum.
+
+The artifact will appear in a live preview panel as you write it."""
 
 _WEB_SEARCH_POLICY_SECTION = """\
 WEB SEARCH TOOL
@@ -80,6 +90,40 @@ Rules when using search results:
   - Do not invent citations or URLs that were not provided.
   - If results seem outdated or incomplete, acknowledge that uncertainty."""
 
+_WEB_FETCH_POLICY_SECTION = """\
+WEB FETCH TOOL
+==============
+
+You have access to a ``web_fetch`` tool that retrieves and extracts content from
+specific web page URLs.
+
+Call it when the user:
+  - Provides a specific URL and asks you to read or analyze it
+  - Asks for the full content of a web page, article, or documentation
+  - Wants you to extract information from a specific website
+  - Needs you to follow up on search results with detailed content
+
+The tool returns:
+  - Full text content extracted from the page (HTML tags removed)
+  - Page title, domain, and URL
+  - Content type information
+
+Usage pattern:
+  1. User provides URL or you find one via web_search
+  2. Call web_fetch with the URL
+  3. Analyze the extracted text content
+  4. Provide insights or answer questions based on the content
+
+Do NOT use web_fetch for:
+  - General searches (use web_search instead)
+  - Multiple pages at once (call the tool multiple times if needed)
+  - Non-HTTP/HTTPS URLs (ftp://, file://, etc.)
+
+When presenting fetched content:
+  - Cite the source URL
+  - Summarize or extract relevant information
+  - Be clear about what came from the fetched page"""
+
 # ---------------------------------------------------------------------------
 # Assembler
 # ---------------------------------------------------------------------------
@@ -89,6 +133,7 @@ _DEFAULT_SECTIONS = (
     _RESPONSE_FORMAT_SECTION,
     _ARTIFACT_POLICY_SECTION,
     _WEB_SEARCH_POLICY_SECTION,
+    _WEB_FETCH_POLICY_SECTION,
 )
 
 

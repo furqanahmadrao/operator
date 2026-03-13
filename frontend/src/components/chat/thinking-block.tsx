@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Brain } from "lucide-react";
 import { ToolBlock } from "./tool-activity";
 
@@ -18,12 +19,39 @@ interface ThinkingBlockProps {
  * Uses the same generic ToolBlock pattern as WebSearchBlock for visual consistency.
  *
  * Behaviour:
- *   - Streaming  → running spinner, "Thinking… Xs" title, not expandable
- *   - Done       → check icon, "Reasoned for Xs" title, collapsed dropdown
- *   - Expanded   → scrollable pre-formatted reasoning text
+ *   - Streaming  → auto-expands to show live reasoning, max height 50vh
+ *   - Done       → auto-collapses after 1s delay (unless manually controlled)
+ *   - Manual toggle → prevents auto-collapse behavior
  */
 export function ThinkingBlock({ content, seconds, isStreaming }: ThinkingBlockProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [manuallyCollapsed, setManuallyCollapsed] = useState(false);
+
   const hasContent = content.length > 0;
+
+  // Auto-expand when streaming starts
+  useEffect(() => {
+    if (isStreaming && !manuallyCollapsed && !isExpanded) {
+      // Use a microtask to defer state update
+      Promise.resolve().then(() => setIsExpanded(true));
+    }
+  }, [isStreaming, manuallyCollapsed, isExpanded]);
+
+  // Auto-collapse when streaming completes (with 1s delay)
+  useEffect(() => {
+    if (!isStreaming && isExpanded && !manuallyCollapsed) {
+      const timer = setTimeout(() => {
+        setIsExpanded(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isStreaming, isExpanded, manuallyCollapsed]);
+
+  // Manual toggle handler
+  const handleToggle = () => {
+    setIsExpanded(!isExpanded);
+    setManuallyCollapsed(true); // User took control
+  };
 
   if (!hasContent && !isStreaming) return null;
 
@@ -38,10 +66,14 @@ export function ThinkingBlock({ content, seconds, isStreaming }: ThinkingBlockPr
       status={isStreaming ? "running" : "completed"}
       icon={<Brain size={11} />}
       title={title}
-      defaultExpanded={false}
+      defaultExpanded={isExpanded}
+      onToggle={handleToggle}
     >
       {hasContent ? (
-        <div className="thinking-content">
+        <div 
+          className="thinking-content" 
+          style={{ maxHeight: isStreaming ? "50vh" : "none" }}
+        >
           <pre className="thinking-pre">{content.trim()}</pre>
         </div>
       ) : null}
